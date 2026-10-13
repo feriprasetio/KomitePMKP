@@ -1,45 +1,50 @@
 # Komite PMKP
 
-Portal untuk pengelolaan dokumen dan program Peningkatan Mutu dan Keselamatan Pasien.
+Portal pengelolaan dokumen Peningkatan Mutu dan Keselamatan Pasien.
 
-## Status deployment saat ini
+## Status saat ini
 
-- index.html adalah landing page statis untuk GitHub Pages.
-- GitHub Pages tidak menjalankan Next.js API routes, autentikasi server, atau Prisma. Karena itu, landing page bukan dashboard operasional.
-- Skema inti PMKP sudah diterapkan pada proyek Supabase yang terhubung. Objek PMKP dipisahkan secara nama dan tidak mengubah tabel AUREKA yang sudah ada.
-- Source aplikasi Next.js lengkap belum tersedia pada branch main, sehingga runtime aplikasi belum dapat dinyatakan ter-deploy.
+- Source aplikasi Next.js, endpoint API, autentikasi, dan schema Prisma berada di repository ini.
+- Database PMKP menggunakan Supabase PostgreSQL melalui Prisma; kredensial database harus disimpan sebagai environment server-side.
+- Database memiliki tabel PMKP yang terisolasi. Dokumen, aktivitas, dan lampiran simulasi tidak diimpor.
+- GitHub Pages hanya menyajikan landing page statis `index.html`. Pages tidak menjalankan Next.js API, session cookie server, maupun Prisma. Dashboard operasional perlu di-host pada platform yang mendukung Next.js server runtime.
 
-## Konfigurasi aplikasi server
+## Variabel environment
 
-Aplikasi membutuhkan hosting yang mendukung Next.js server runtime (misalnya Vercel atau Node server), Prisma Client, dan penyimpanan lampiran persisten.
+Atur variabel berikut pada host aplikasi (bukan di Git):
 
-Atur variabel rahasia di dashboard hosting, bukan di Git:
+- `DATABASE_URL`: koneksi PostgreSQL Supabase untuk server, dengan TLS.
+- `AUTH_SECRET`: secret acak minimal 32 karakter.
+- `ADMIN_USERNAME=superadmin`
+- `ADMIN_NAME=Komite PMKP`
+- `ADMIN_INITIAL_PASSWORD`: hanya dipakai untuk bootstrap jika akun belum ada.
 
-- DATABASE_URL: koneksi server-side ke PostgreSQL Supabase, dengan TLS.
-- AUTH_SECRET: nilai acak minimal 32 karakter.
-- ADMIN_USERNAME: default superadmin.
-- ADMIN_NAME: Komite PMKP.
-- ADMIN_INITIAL_PASSWORD: password sementara untuk bootstrap.
+Akun `superadmin` sudah disiapkan di tabel `public."User"`, nama `Komite PMKP`, role `superadmin`, dan status wajib ganti password awal. Password awal adalah kredensial sementara dan harus segera diganti saat masuk. Jangan masukkan password aktual atau connection string ke `.env.example`, source code, atau variabel berawalan `NEXT_PUBLIC_`.
 
-Password awal harus segera diganti setelah login pertama. Jangan menyimpan password atau connection string asli pada source repository, halaman statis, atau variabel NEXT_PUBLIC_*.
+## Database
 
-## Database Supabase
+Migration `supabase/migrations/20261013000000_komite_pmkp_core_schema.sql` membuat tabel PMKP dan mengaktifkan Row Level Security. Akses langsung dari peran Supabase `anon` dan `authenticated` ditolak; aplikasi mengakses database dari server menggunakan `DATABASE_URL`.
 
-Migration berada pada supabase/migrations/20261013000000_komite_pmkp_core_schema.sql dan membuat tabel PmkpStandard, PmkpDocument, PmkpActivity, PmkpAttachment, dan User. RLS diaktifkan dan akses API publik ditolak. Server aplikasi harus mengakses database secara server-side menggunakan kredensial yang disimpan di environment hosting.
+Skema yang disiapkan:
+- `PmkpStandard`
+- `PmkpDocument`
+- `PmkpActivity`
+- `PmkpAttachment`
+- `User`
 
-Data operasional belum dimasukkan. Tidak ada dokumen, aktivitas, atau lampiran simulasi di tabel PMKP.
+Tidak ada data dokumen, aktivitas, atau lampiran contoh. Pada login pertama, aplikasi menyiapkan taksonomi 11 standar PMKP sebagai referensi kosong—bukan data simulasi.
 
-## Deployment
+## Menjalankan aplikasi
 
-1. Push seluruh source Next.js aplikasi ke repository.
-2. Hubungkan repository ke hosting server-side, bukan GitHub Pages.
-3. Set environment variables pada hosting.
-4. Jalankan Prisma generate dan migrasi yang sudah ditinjau.
-5. Uji login, perubahan password, CRUD, audit trail, unggah/unduh lampiran, dan akses tanpa sesi sebelum digunakan operasional.
+Versi Node.js 20.9 atau lebih baru direkomendasikan.
 
-## Struktur
+1. Salin `.env.example` menjadi `.env` hanya di lingkungan lokal dan isi nilai rahasia.
+2. Jalankan `npm install`.
+3. Jalankan `npm run dev` untuk pengembangan.
+4. Gunakan `npm run check`, `npm run lint`, dan `npm run build` sebelum deployment.
 
-- prisma/schema.prisma — model data Prisma untuk PostgreSQL.
-- supabase/migrations/ — skema database.
-- index.html — landing page GitHub Pages.
-- .env.example — contoh konfigurasi tanpa secret nyata.
+Untuk deployment server, hubungkan repository ke platform Next.js (misalnya Vercel), lalu atur environment variables di dashboard platform dan jalankan build. Tidak diperlukan database seed untuk dokumen simulasi.
+
+## Catatan produksi
+
+Lampiran saat ini memakai direktori filesystem. Untuk deployment serverless/multi-instance, pindahkan lampiran ke Supabase Storage private bucket sebelum menggunakan fitur unggah sebagai penyimpanan bukti operasional. Setelah deployment, uji login, penggantian password, CRUD, akses tanpa sesi, dan unduh lampiran.
