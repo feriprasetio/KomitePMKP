@@ -39,6 +39,8 @@ jobs:
               raise SystemExit(f'Expected one inline application script, found {len(inline)}')
           if 'pmkp-bootstrap-admin' not in html or 'pmkp-evidence' not in html:
               raise SystemExit('Required Supabase authentication or evidence-storage integration is missing')
+          if 'function requestPasswordRecovery' not in html or 'db.auth.resetPasswordForEmail' not in html or 'data-auth-recover' not in html:
+              raise SystemExit('Secure password recovery flow is missing')
           if 'function preferredDocs' not in html or 'function openEvidenceViewer' not in html or '.viewerpanel' not in html:
               raise SystemExit('Playbook source fallback or private evidence viewer is missing')
           if 'function progressFor(list){let done=0,total=0;' not in html:
