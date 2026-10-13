@@ -48,8 +48,8 @@ jobs:
           import re
           from pathlib import Path
           html = Path('_site/index.html').read_text(encoding='utf-8')
-          scripts = re.findall(r'<script\\b([^>]*)>(.*?)</script>', html, flags=re.I | re.S)
-          inline = [body for attrs, body in scripts if not re.search(r'\\bsrc\\s*=', attrs, flags=re.I) and body.strip()]
+          scripts = re.findall(r'<script\b([^>]*)>(.*?)</script>', html, flags=re.I | re.S)
+          inline = [body for attrs, body in scripts if not re.search(r'\bsrc\s*=', attrs, flags=re.I) and body.strip()]
           if len(inline) != 1:
               raise SystemExit(f'Expected one inline application script, found {len(inline)}')
           Path('/tmp/pmkp-inline.js').write_text(inline[0], encoding='utf-8')
