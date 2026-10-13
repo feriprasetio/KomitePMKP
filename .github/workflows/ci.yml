@@ -77,7 +77,7 @@ jobs:
                   'PMKP evidence upload authenticated', 'pmkp_standard_admin_write'
               ],
               'supabase/migrations/20261013074509_pmkp_release_policy_optimization.sql': [
-                  'pmkp_standard_read_authenticated', 'pmkp_activity_insert'
+                  'pmkp_standard_insert_admin', 'pmkp_activity_insert'
               ],
               'supabase/migrations/20261013074533_pmkp_release_remove_duplicate_policies.sql': [
                   'pmkp_standard_admin_insert', 'pmkp_standard_admin_update', 'pmkp_standard_admin_delete'
