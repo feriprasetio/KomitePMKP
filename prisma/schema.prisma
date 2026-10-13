@@ -1,0 +1,91 @@
+// Prisma schema for the Komite PMKP application.
+// Production database: Supabase PostgreSQL. Keep DATABASE_URL server-side only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PmkpStandard {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  title       String
+  description String?
+  color       String   @default("#10b981")
+  sortOrder   Int      @default(0)
+  documents   PmkpDocument[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PmkpDocument {
+  id              String   @id @default(cuid())
+  stdCode         String
+  standardId      String
+  standard        PmkpStandard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+  subTopic        String
+  title           String
+  description     String?
+  pic             String?
+  status          String   @default("todo")
+  progress        Int      @default(0)
+  priority        String   @default("Sedang")
+  dueDate         DateTime?
+  completedAt     DateTime?
+  pendukungDocs   String?
+  adminDocs       String?
+  regulasiDocs    String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  activities      PmkpActivity[]
+  attachments     PmkpAttachment[]
+
+  @@index([standardId])
+}
+
+model PmkpAttachment {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    PmkpDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  filename    String
+  filePath    String
+  fileSize    Int      @default(0)
+  mimeType    String?
+  uploadedBy  String   @default("Komite PMKP")
+  createdAt   DateTime @default(now())
+
+  @@index([documentId])
+}
+
+model PmkpActivity {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    PmkpDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actor       String
+  action      String
+  fromValue   String?
+  toValue     String?
+  message     String
+  createdAt   DateTime @default(now())
+
+  @@index([documentId])
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  name               String
+  username           String   @unique
+  passwordHash       String
+  role               String   @default("user")
+  mustChangePassword Boolean  @default(true)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([role, active])
+}
