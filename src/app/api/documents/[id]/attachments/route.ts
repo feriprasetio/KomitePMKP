@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import { db } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
-import { uploadPrivateObject } from "@/lib/storage";
+import { deletePrivateObject, uploadPrivateObject } from "@/lib/storage";
 
 export const runtime = "nodejs";
 const MAX_SIZE = 20 * 1024 * 1024;
@@ -17,7 +17,7 @@ const mimeByExtension: Record<string,string> = {
 function parseArr(s:string|null|undefined):string[]{if(!s)return[];try{const v=JSON.parse(s);return Array.isArray(v)?v.filter((x):x is string=>typeof x==="string"):[]}catch{return[]}}
 function safeName(filename:string){return path.basename(filename).normalize("NFKC").replace(/[^a-zA-Z0-9._-]/g,"_").replace(/^\.+/,"").slice(-100)||"evidence"}
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
- let uploadedObject: string|undefined;
+ let uploadedObject: string|undefined;\n let objectSavedToDatabase = false;
  try{
   const user=await requireSession();
   if(!user)return NextResponse.json({status:"error",message:"Autentikasi diperlukan."},{status:401});
@@ -37,12 +37,16 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   uploadedObject=id+"/"+randomUUID()+"-"+filename;
   const contentType=mimeByExtension[extension];
   await uploadPrivateObject(uploadedObject,new Uint8Array(await file.arrayBuffer()),contentType);
-  const attachment=await db.pmkpAttachment.create({data:{documentId:id,filename:file.name,filePath:uploadedObject,fileSize:file.size,mimeType:contentType,evidenceLabel:label,uploadedBy:user.name}});
-  await db.pmkpActivity.create({data:{documentId:id,actor:user.name,action:"attachment_uploaded",message:"Bukti diunggah ("+label+"): "+file.name,toValue:label}});
+  const attachment=await db.$transaction(async(tx)=>{
+   const row=await tx.pmkpAttachment.create({data:{documentId:id,filename:file.name,filePath:uploadedObject!,fileSize:file.size,mimeType:contentType,evidenceLabel:label,uploadedBy:user.name}});
+   await tx.pmkpActivity.create({data:{documentId:id,actor:user.name,action:"attachment_uploaded",message:"Bukti diunggah ("+label+"): "+file.name,toValue:label}});
+   return row;
+  });
+  objectSavedToDatabase = true;
   return NextResponse.json({status:"success",data:{...attachment,createdAt:attachment.createdAt.toISOString()}},{status:201});
  }catch(e){
   console.error("Evidence upload failed",e);
-  if(uploadedObject){/* metadata insert failed after storage upload: leave the private object for safe reconciliation rather than hiding a failed delete */}
+  if(uploadedObject && !objectSavedToDatabase){try{await deletePrivateObject(uploadedObject)}catch(cleanupError){console.error("Storage rollback failed",cleanupError)}}
   return NextResponse.json({status:"error",message:e instanceof Error?e.message:"Unggah bukti gagal."},{status:500});
  }
 }
