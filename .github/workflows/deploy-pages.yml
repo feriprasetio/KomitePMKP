@@ -42,6 +42,34 @@ jobs:
           test -s _site/playbook-seed.gz.b64
           echo "App bytes: $(wc -c < _site/index.html)"
           echo "Playbook seed bytes: $(wc -c < _site/playbook-seed.gz.b64)"
+      - name: Validate app JavaScript
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path('_site/index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script\\b([^>]*)>(.*?)</script>', html, flags=re.I | re.S)
+          inline = [body for attrs, body in scripts if not re.search(r'\\bsrc\\s*=', attrs, flags=re.I) and body.strip()]
+          if len(inline) != 1:
+              raise SystemExit(f'Expected one inline application script, found {len(inline)}')
+          Path('/tmp/pmkp-inline.js').write_text(inline[0], encoding='utf-8')
+          PY
+          node --check /tmp/pmkp-inline.js
+      - name: Validate Playbook seed
+        run: |
+          python3 - <<'PY'
+          import base64, gzip, json
+          from pathlib import Path
+          raw = base64.b64decode(Path('_site/playbook-seed.gz.b64').read_text().strip(), validate=True)
+          data = json.loads(gzip.decompress(raw))
+          keys = [row['playbookKey'] for row in data]
+          if len(data) != 138 or len(keys) != len(set(keys)):
+              raise SystemExit(f'Invalid Playbook seed: count={len(data)}, unique={len(set(keys))}')
+          required = {'stdCode','elementCode','title','sourcePage','implementation','adminDocs'}
+          if any(not required.issubset(row) for row in data):
+              raise SystemExit('Playbook seed has incomplete required fields')
+          print(f'Validated {len(data)} source rows; 8 PMKP 4.1 rows are supplied as a checked inline supplement.')
+          PY
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
