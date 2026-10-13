@@ -1,325 +1,191 @@
 "use client";
-
-import { FormEvent, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, AlertTriangle, CheckCircle2, ClipboardList, Download, FilePlus2, LogOut, RefreshCw, Search, ShieldCheck } from "lucide-react";
-import type { DashboardStats, PmkpDocument, Priority, StandardWithStats, StatusKey } from "./types";
+import { Activity, AlertTriangle, ArrowDownToLine, ArrowUpRight, BookOpen, CalendarDays, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock3, Eye, FileCheck2, FilePlus2, FileText, Filter, FolderOpen, LayoutDashboard, ListChecks, Loader2, LogOut, Paperclip, Plus, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Upload, X } from "lucide-react";
+import type { DashboardStats, DocActivity, PmkpAttachment, PmkpDocument, Priority, StandardWithStats, StatusKey } from "./types";
 
-type FormState = {
-  stdCode: string;
-  standardId: string;
-  subTopic: string;
-  title: string;
-  description: string;
-  pic: string;
-  status: StatusKey;
-  progress: number;
-  priority: Priority;
-  dueDate: string;
-};
+type TabKey = "overview" | "playbook" | "evidence" | "activity";
+type Props = { standards: StandardWithStats[]; documents: PmkpDocument[]; stats: DashboardStats; pics: string[]; displayName?: string; role?: string };
+type EditForm = { pic:string; priority:Priority; status:StatusKey; dueDate:string; notes:string };
+type NewForm = { standardId:string; ep:string; title:string; pic:string; dueDate:string; description:string };
+const labels:Record<StatusKey,string>={todo:"Belum mulai",prog:"Berjalan",review:"Perlu review",done:"Selesai",block:"Terhambat"};
+const order:StatusKey[]=["todo","prog","review","block","done"];
+const priorityColor:Record<Priority,string>={Tinggi:"text-rose-700 bg-rose-50 border-rose-100",Sedang:"text-amber-700 bg-amber-50 border-amber-100",Rendah:"text-slate-600 bg-slate-100 border-slate-200"};
+const statusColor:Record<StatusKey,string>={todo:"text-slate-600 bg-slate-100",prog:"text-sky-800 bg-sky-50",review:"text-amber-800 bg-amber-50",done:"text-emerald-800 bg-emerald-50",block:"text-rose-800 bg-rose-50"};
+function dateText(date?:string|null){if(!date)return"Belum ditetapkan";const d=new Date(date);return Number.isNaN(d.getTime())?"Tanggal tidak valid":d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"})}
+function isOverdue(d:PmkpDocument){return Boolean(d.dueDate&&new Date(d.dueDate).getTime()<Date.now()&&d.status!=="done")}
+function percent(d:PmkpDocument){return d.admin.length?Math.round(d.checkedItems.filter(v=>d.admin.includes(v)).length/d.admin.length*100):(d.progress||0)}
+function fileSize(n:number){return n<1024?n+" B":n<1048576?Math.round(n/1024)+" KB":(n/1048576).toFixed(1)+" MB"}
+function Progress({value,color="#059669",height=6}:{value:number;color?:string;height?:number}){return <div className="w-full overflow-hidden rounded-full bg-slate-100" style={{height}}><div className="h-full rounded-full transition-all duration-300" style={{width:Math.max(0,Math.min(100,value))+"%",backgroundColor:color}}/></div>}
+function Status({value}:{value:StatusKey}){return <span className={"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold "+statusColor[value]}><span className="size-1.5 rounded-full bg-current"/>{labels[value]}</span>}
+function Priority({value}:{value:Priority}){return <span className={"inline-flex rounded-full border px-2 py-1 text-[10px] font-bold "+priorityColor[value]}>{value}</span>}
+export function PmkpDashboard({standards:initialStandards,documents:initialDocuments,stats:initialStats,displayName="Komite PMKP",role="user"}:Props){
+ const router=useRouter();
+ const [standards,setStandards]=useState(initialStandards);
+ const [documents,setDocuments]=useState(initialDocuments);
+ const [stats,setStats]=useState(initialStats);
+ const [tab,setTab]=useState<TabKey>("overview");
+ const [standardFilter,setStandardFilter]=useState("all");
+ const [statusFilter,setStatusFilter]=useState<"all"|StatusKey>("all");
+ const [priorityFilter,setPriorityFilter]=useState<"all"|Priority>("all");
+ const [query,setQuery]=useState("");
+ const [page,setPage]=useState(1);
+ const [selectedId,setSelectedId]=useState<string|null>(null);
+ const [attachments,setAttachments]=useState<PmkpAttachment[]>([]);
+ const [allAttachments,setAllAttachments]=useState<PmkpAttachment[]>([]);
+ const [detailActivities,setDetailActivities]=useState<DocActivity[]>([]);
+ const [activities,setActivities]=useState<any[]>(initialStats.activities||[]);
+ const [busy,setBusy]=useState(false);
+ const [uploadBusy,setUploadBusy]=useState(false);
+ const [uploadLabel,setUploadLabel]=useState("");
+ const [file,setFile]=useState<File|null>(null);
+ const [edit,setEdit]=useState<EditForm|null>(null);
+ const [notice,setNotice]=useState<{message:string;error:boolean}|null>(null);
+ const [newOpen,setNewOpen]=useState(false);
+ const [newForm,setNewForm]=useState<NewForm>({standardId:initialStandards[0]?.id||"",ep:"a",title:"",pic:"",dueDate:"",description:""});
+ const [standardsExpanded,setStandardsExpanded]=useState(true);
+ const activeDoc=useMemo(()=>documents.find(d=>d.id===selectedId)||null,[documents,selectedId]);
+ const activeStandard=standards.find(s=>s.code===standardFilter);
+ useEffect(()=>{setStandards(initialStandards)},[initialStandards]);
+ useEffect(()=>{setDocuments(initialDocuments)},[initialDocuments]);
+ useEffect(()=>{setStats(initialStats)},[initialStats]);
+ const filtered=useMemo(()=>{
+  const q=query.trim().toLocaleLowerCase("id-ID");
+  return documents.filter(d=>{
+   const standardOk=standardFilter==="all"||d.standard?.code===standardFilter;
+   const statusOk=statusFilter==="all"||d.status===statusFilter;
+   const priorityOk=priorityFilter==="all"||d.priority===priorityFilter;
+   const searchable=[d.stdCode,d.title,d.subTopic,d.elementAssessment,d.pic].filter(Boolean).join(" ").toLocaleLowerCase("id-ID");
+   return standardOk&&statusOk&&priorityOk&&(!q||searchable.includes(q));
+  }).sort((a,b)=>a.stdCode.localeCompare(b.stdCode,"id")||a.title.localeCompare(b.title,"id"));
+ },[documents,standardFilter,statusFilter,priorityFilter,query]);
+ const perPage=12;
+ const pageCount=Math.max(1,Math.ceil(filtered.length/perPage));
+ const shown=filtered.slice((page-1)*perPage,page*perPage);
+ const checkedCount=documents.reduce((n,d)=>n+d.checkedItems.filter(v=>d.admin.includes(v)).length,0);
+ const checklistCount=documents.reduce((n,d)=>n+d.admin.length,0);
+ const overall=checklistCount?Math.round(checkedCount/checklistCount*100):0;
+ const finished=documents.filter(d=>d.status==="done").length;
+ const blocked=documents.filter(d=>d.status==="block").length;
+ const late=documents.filter(isOverdue).length;
+ const needReview=documents.filter(d=>d.status==="review").length;
 
-type Props = {
-  standards: StandardWithStats[];
-  documents: PmkpDocument[];
-  stats: DashboardStats;
-  pics: string[];
-  displayName?: string;
-};
+ function notify(message:string,error=false){setNotice({message,error});window.setTimeout(()=>setNotice(null),4500)}
+ function pickStandard(code:string){setStandardFilter(code);setTab("playbook");setPage(1)}
+ async function loadAttachmentsForTab(){try{const r=await fetch("/api/attachments",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.message||"Repository bukti tidak dapat dimuat.");setAllAttachments(j.data||[])}catch(e){notify(e instanceof Error?e.message:"Tidak dapat memuat bukti.",true)}}
+ async function loadActivities(){try{const r=await fetch("/api/activities?limit=100",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.message||"Log aktivitas tidak dapat dimuat.");setActivities(j.data||[])}catch(e){notify(e instanceof Error?e.message:"Tidak dapat memuat aktivitas.",true)}}
+ useEffect(()=>{if(tab==="evidence")void loadAttachmentsForTab();if(tab==="activity")void loadActivities()},[tab]);
+ useEffect(()=>{setPage(1)},[query,statusFilter,priorityFilter,standardFilter]);
+ async function openDoc(d:PmkpDocument){
+  setSelectedId(d.id);setEdit({pic:d.pic||"",priority:d.priority,status:d.status,dueDate:d.dueDate?new Date(d.dueDate).toISOString().slice(0,10):"",notes:d.notes||""});setUploadLabel(d.admin[0]||"");setFile(null);setAttachments([]);setDetailActivities([]);
+  try{
+   const [ar,dr]=await Promise.all([fetch("/api/documents/"+encodeURIComponent(d.id)+"/attachments",{cache:"no-store"}),fetch("/api/documents/"+encodeURIComponent(d.id),{cache:"no-store"})]);
+   const aj=await ar.json();if(ar.ok)setAttachments(aj.data||[]);
+   const dj=await dr.json();if(dr.ok)setDetailActivities(dj.data?.activities||[]);
+  }catch{notify("Detail item belum dapat dimuat. Periksa koneksi aplikasi.",true)}
+ }
+ async function patchDoc(id:string,payload:Record<string,unknown>){
+  setBusy(true);
+  try{
+   const r=await fetch("/api/documents/"+encodeURIComponent(id),{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   const j=await r.json();if(!r.ok)throw new Error(j.message||"Perubahan gagal disimpan.");
+   const fresh=j.data as PmkpDocument;
+   setDocuments(old=>old.map(d=>d.id===id?{...d,...fresh}:d));
+   const freshActivities=(fresh as PmkpDocument&{activities?:DocActivity[]}).activities;if(freshActivities)setDetailActivities(freshActivities);
+   const next=documents.map(d=>d.id===id?fresh:d);
+   setStandards(old=>old.map(s=>{
+    if(s.id!==fresh.standardId)return s;
+    const ds=next.filter(d=>d.standardId===s.id);
+    return {...s,stats:{...s.stats,done:ds.filter(d=>d.status==="done").length,prog:ds.filter(d=>d.status==="prog"||d.status==="review").length,todo:ds.filter(d=>d.status==="todo").length,block:ds.filter(d=>d.status==="block").length,pct:ds.length?Math.round(ds.reduce((n,d)=>n+d.progress,0)/ds.length):0,overdue:ds.filter(isOverdue).length}};
+   }));
+   setStats(old=>({...old,avgProgress:next.length?Math.round(next.reduce((n,d)=>n+d.progress,0)/next.length):0}));
+   notify("Perubahan tersimpan.");router.refresh();return true;
+  }catch(e){notify(e instanceof Error?e.message:"Perubahan gagal disimpan.",true);return false}
+  finally{setBusy(false)}
+ }
+ async function toggleChecklist(d:PmkpDocument,label:string){
+  const set=new Set(d.checkedItems.filter(x=>d.admin.includes(x)));if(set.has(label))set.delete(label);else set.add(label);
+  await patchDoc(d.id,{checkedItems:Array.from(set)});
+ }
+ async function saveEdit(e:FormEvent<HTMLFormElement>){
+  e.preventDefault();if(!activeDoc||!edit)return;
+  await patchDoc(activeDoc.id,{pic:edit.pic.trim()||null,priority:edit.priority,status:edit.status,dueDate:edit.dueDate?new Date(edit.dueDate+"T12:00:00").toISOString():null,notes:edit.notes.trim()||null});
+ }
+ async function uploadEvidence(e:FormEvent<HTMLFormElement>){
+  e.preventDefault();if(!activeDoc||!file||!uploadLabel){notify("Pilih file dan kategori bukti terlebih dahulu.",true);return}
+  setUploadBusy(true);
+  try{
+   const form=new FormData();form.set("file",file);form.set("evidenceLabel",uploadLabel);
+   const r=await fetch("/api/documents/"+encodeURIComponent(activeDoc.id)+"/attachments",{method:"POST",body:form});const j=await r.json();
+   if(!r.ok)throw new Error(j.message||"Unggah bukti gagal.");
+   setAttachments(old=>[j.data,...old]);setFile(null);const input=document.getElementById("pmkp-file") as HTMLInputElement|null;if(input)input.value="";
+   notify("Bukti tersimpan pada Storage privat.");void loadAttachmentsForTab();
+  }catch(e){notify(e instanceof Error?e.message:"Unggah bukti gagal.",true)}
+  finally{setUploadBusy(false)}
+ }
+ async function createItem(e:FormEvent<HTMLFormElement>){
+  e.preventDefault();const standard=standards.find(s=>s.id===newForm.standardId);if(!standard){notify("Pilih standar.",true);return}
+  setBusy(true);
+  try{
+   const admin=["Bukti pelaksanaan","Laporan evaluasi","Rencana tindak lanjut"];
+   const payload={standardId:standard.id,stdCode:standard.code+newForm.ep,elementCode:newForm.ep,subTopic:newForm.title.trim(),title:newForm.title.trim(),description:newForm.description.trim()||null,pic:newForm.pic.trim()||null,status:"todo",priority:"Sedang",dueDate:newForm.dueDate?new Date(newForm.dueDate+"T12:00:00").toISOString():null,admin,pendukung:[],regulasi:[]};
+   const r=await fetch("/api/documents",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const j=await r.json();if(!r.ok)throw new Error(j.message||"Item gagal dibuat.");
+   setDocuments(old=>[...old,j.data]);setNewOpen(false);setTab("playbook");setStandardFilter(standard.code);setNewForm({standardId:standard.id,ep:"a",title:"",pic:"",dueDate:"",description:""});notify("Item tambahan berhasil dibuat.");
+   setTimeout(()=>void openDoc(j.data as PmkpDocument),150);router.refresh();
+  }catch(e){notify(e instanceof Error?e.message:"Item gagal dibuat.",true)}
+  finally{setBusy(false)}
+ }
+ async function logout(){try{await fetch("/api/auth/logout",{method:"POST"})}catch{}router.replace("/login");router.refresh()}
+ function attachmentUrl(a:PmkpAttachment,view:boolean){return "/api/documents/"+encodeURIComponent(a.documentId)+"/attachments/"+encodeURIComponent(a.id)+(view?"?view=1":"")}
+ function tabButton(value:TabKey,title:string,Icon:any){return <button key={value} onClick={()=>setTab(value)} className={"inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition sm:px-3.5 sm:text-sm "+(tab===value?"bg-emerald-700 text-white shadow-sm":"text-slate-600 hover:bg-slate-100")}><Icon size={16}/>{title}</button>}
 
-const statusLabels: Record<StatusKey, string> = {
-  todo: "Belum dimulai",
-  prog: "Dalam proses",
-  review: "Menunggu review",
-  done: "Selesai",
-  block: "Terhambat",
-};
-const statusClasses: Record<StatusKey, string> = {
-  todo: "bg-slate-100 text-slate-700",
-  prog: "bg-sky-100 text-sky-800",
-  review: "bg-amber-100 text-amber-800",
-  done: "bg-emerald-100 text-emerald-800",
-  block: "bg-rose-100 text-rose-800",
-};
+ return <main className="pmkp-bg min-h-screen"><div className="mx-auto flex min-h-screen max-w-[1680px]">
+ <aside className="hidden w-[250px] shrink-0 border-r border-slate-200/80 bg-white/75 px-4 py-5 lg:flex lg:flex-col">
+  <div className="flex items-center gap-3 px-2"><div className="grid size-10 place-items-center rounded-2xl bg-emerald-700 text-white"><ShieldCheck size={22}/></div><div><p className="text-sm font-extrabold text-slate-900">Dokumen Akreditasi</p><p className="text-xs font-semibold text-emerald-800">Komite PMKP</p></div></div>
+  <p className="mt-8 px-2 text-[10px] font-bold uppercase tracking-[.18em] text-slate-400">Workspace</p>
+  <nav className="mt-2 space-y-1">{[{v:"overview" as const,t:"Ringkasan",I:LayoutDashboard},{v:"playbook" as const,t:"Checklist Playbook",I:ListChecks},{v:"evidence" as const,t:"Repository bukti",I:FolderOpen},{v:"activity" as const,t:"Aktivitas",I:Activity}].map(n=><button key={n.v} onClick={()=>setTab(n.v)} className={"flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold "+(tab===n.v?"bg-emerald-50 text-emerald-800":"text-slate-600 hover:bg-slate-100")}><n.I size={17}/>{n.t}{n.v==="evidence"&&allAttachments.length>0&&<span className="ml-auto rounded-full bg-slate-200 px-2 py-0.5 text-[10px]">{allAttachments.length}</span>}</button>)}</nav>
+  <div className="mt-8 flex items-center justify-between px-2"><p className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-400">Standar Playbook</p><button onClick={()=>setStandardsExpanded(v=>!v)} aria-label="Tampilkan standar" className="rounded-md p-1 text-slate-500 hover:bg-slate-100"><ChevronDown size={15} className={standardsExpanded?"":"-rotate-90"}/></button></div>
+  {standardsExpanded&&<div className="pmkp-scroll mt-2 flex-1 space-y-1 overflow-y-auto pr-1"><button onClick={()=>pickStandard("all")} className={"w-full rounded-xl px-3 py-2.5 text-left "+(standardFilter==="all"?"bg-slate-900 text-white":"text-slate-600 hover:bg-slate-100")}><div className="flex items-center justify-between text-sm font-semibold"><span>Semua standar</span><span className="text-xs opacity-70">{documents.length}</span></div></button>{standards.map(s=><button key={s.id} onClick={()=>pickStandard(s.code)} className={"w-full rounded-xl px-3 py-2.5 text-left "+(standardFilter===s.code?"bg-emerald-50 ring-1 ring-emerald-200":"hover:bg-slate-100")}><div className="flex items-center justify-between gap-2"><span className="text-xs font-extrabold" style={{color:s.color}}>{s.code}</span><span className="text-[10px] font-semibold text-slate-400">{s.stats.done}/{s.stats.total}</span></div><p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{s.title}</p><div className="mt-2"><Progress value={s.stats.pct} color={s.color} height={4}/></div></button>)}</div>}
+  <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/80 p-3"><div className="flex items-center gap-2 text-xs font-bold text-emerald-900"><CheckCircle2 size={15}/>Berbasis bukti</div><p className="mt-1.5 text-[11px] leading-4 text-emerald-800/80">Progres mengikuti checklist yang diverifikasi. Status selesai mensyaratkan checklist lengkap.</p></div>
+  <div className="mt-4 flex items-center gap-3 border-t border-slate-200 pt-4"><div className="grid size-9 place-items-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">{displayName.slice(0,1).toUpperCase()}</div><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-slate-800">{displayName}</p><p className="text-[10px] text-slate-500">{role==="superadmin"?"Administrator":"Pengguna PMKP"}</p></div><button onClick={logout} title="Keluar" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><LogOut size={16}/></button></div>
+ </aside>
 
-function initialForm(standards: StandardWithStats[], doc?: PmkpDocument | null): FormState {
-  const standard = doc ? standards.find((item) => item.id === doc.standardId) : standards[0];
-  return {
-    stdCode: doc?.stdCode ?? ((standard?.code ?? "PMKP 1") + "a"),
-    standardId: doc?.standardId ?? standard?.id ?? "",
-    subTopic: doc?.subTopic ?? "",
-    title: doc?.title ?? "",
-    description: doc?.description ?? "",
-    pic: doc?.pic ?? "",
-    status: doc?.status ?? "todo",
-    progress: doc?.progress ?? 0,
-    priority: doc?.priority ?? "Sedang",
-    dueDate: doc?.dueDate ? new Date(doc.dueDate).toISOString().slice(0, 10) : "",
-  };
-}
+ <section className="min-w-0 flex-1 px-3 pb-8 pt-4 sm:px-6 lg:px-8 lg:pt-6">
+  <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-4"><div className="flex items-center gap-3"><div className="grid size-9 place-items-center rounded-xl bg-emerald-700 text-white lg:hidden"><ShieldCheck size={19}/></div><div><p className="text-[10px] font-bold uppercase tracking-[.14em] text-emerald-800">UPT RSUD Sultan Syarif Mohamad Alkadrie</p><h1 className="mt-0.5 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">Dokumen Akreditasi PMKP</h1></div></div><div className="flex items-center gap-2"><span className="hidden items-center gap-1.5 rounded-full border border-emerald-100 bg-white/80 px-3 py-2 text-xs font-semibold text-emerald-800 sm:inline-flex"><span className="size-1.5 rounded-full bg-emerald-500"/>Playbook STARKES</span><button onClick={()=>{router.refresh();notify("Data terbaru diminta dari server.")}} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700"><RefreshCw size={14}/>Muat ulang</button><button onClick={logout} aria-label="Keluar" className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 lg:hidden"><LogOut size={16}/></button></div></header>
+  <nav className="mt-4 flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/85 p-1.5">{tabButton("overview","Ringkasan",LayoutDashboard)}{tabButton("playbook","Checklist Playbook",ListChecks)}{tabButton("evidence","Dokumen bukti",FolderOpen)}{tabButton("activity","Aktivitas",Activity)}</nav>
 
-function dateLabel(value?: string | null) {
-  if (!value) return "Belum ditetapkan";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Tanggal tidak valid";
-  return date.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
-}
+  {tab==="overview"&&<div className="mt-5 space-y-5">
+   <section className="pmkp-card p-5 sm:p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.14em] text-emerald-800">Pemantauan kesiapan</p><h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Satu ruang kerja untuk seluruh Playbook PMKP.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Telusuri item per elemen penilaian, unggah bukti administratif, verifikasi checklist, dan pantau progres tanpa menumpuk semua data di satu layar.</p></div><button onClick={()=>{setNewForm(v=>({...v,standardId:standards[0]?.id||""}));setNewOpen(true)}} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white"><Plus size={16}/>Tambah item kerja</button></div>
+   <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-[1fr_180px] sm:items-center"><div><div className="flex items-end justify-between gap-3"><div><p className="text-xs font-semibold text-slate-500">Checklist bukti terverifikasi</p><div className="mt-1 flex flex-wrap items-baseline gap-2"><span className="text-3xl font-extrabold tabular-nums text-slate-900">{overall}%</span><span className="text-xs text-slate-500">{checkedCount} dari {checklistCount}</span></div></div><span className="text-xs text-slate-500">{finished} item selesai</span></div><div className="mt-3"><Progress value={overall} height={10}/></div></div><div className="rounded-xl bg-slate-50 px-4 py-3"><p className="text-[11px] font-semibold text-slate-500">Cakupan Playbook</p><p className="mt-1 text-lg font-extrabold text-slate-900">{standards.length} standar <span className="text-sm font-medium text-slate-500">/ {documents.length} item</span></p><p className="text-[11px] text-slate-500">PMKP 4.1 dipetakan terpisah</p></div></div></section>
+   <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[{label:"Total item",value:documents.length,sub:"Daftar kerja Playbook",I:BookOpen,c:"text-sky-700 bg-sky-50"},{label:"Selesai",value:finished,sub:"Checklist bukti lengkap",I:CheckCircle2,c:"text-emerald-700 bg-emerald-50"},{label:"Perlu perhatian",value:needReview+blocked,sub:blocked+" terhambat · "+needReview+" review",I:AlertTriangle,c:"text-amber-700 bg-amber-50"},{label:"Lewat tenggat",value:late,sub:"Belum selesai melewati tanggal",I:CalendarDays,c:"text-rose-700 bg-rose-50"}].map(k=><div key={k.label} className="pmkp-card flex items-start gap-3 p-4"><div className={"grid size-10 shrink-0 place-items-center rounded-xl "+k.c}><k.I size={19}/></div><div><p className="text-xs font-semibold text-slate-500">{k.label}</p><p className="mt-1 text-2xl font-extrabold tabular-nums text-slate-900">{k.value}</p><p className="mt-1 text-[11px] text-slate-500">{k.sub}</p></div></div>)}</section>
+   <section className="pmkp-card p-5"><div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-base font-extrabold text-slate-900">Progres per standar</h2><p className="mt-1 text-xs text-slate-500">Pilih standar untuk membuka checklist.</p></div><button onClick={()=>{setStandardFilter("all");setTab("playbook")}} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800">Lihat semua item <ArrowUpRight size={14}/></button></div><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{standards.map(s=><button key={s.id} onClick={()=>pickStandard(s.code)} className="rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-300 hover:bg-emerald-50/30"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-extrabold" style={{color:s.color}}>{s.code}</p><h3 className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-slate-800">{s.title}</h3></div><span className="text-lg font-extrabold tabular-nums text-slate-800">{s.stats.pct}%</span></div><div className="mt-3"><Progress value={s.stats.pct} color={s.color}/></div><div className="mt-2 flex justify-between text-[11px] text-slate-500"><span>{s.stats.done}/{s.stats.total} selesai</span><span>{s.stats.overdue?s.stats.overdue+" terlambat":"Tidak ada terlambat"}</span></div></button>)}</div></section>
+   <section className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]"><div className="pmkp-card p-5"><div className="flex items-center justify-between gap-3"><div><h2 className="text-base font-extrabold text-slate-900">Perlu ditindaklanjuti</h2><p className="mt-1 text-xs text-slate-500">Item terhambat, terlambat, atau perlu review.</p></div><button onClick={()=>{setStandardFilter("all");setTab("playbook")}} className="text-xs font-bold text-emerald-800">Buka daftar</button></div><div className="mt-4 divide-y divide-slate-100">{documents.filter(d=>d.status==="block"||isOverdue(d)||d.status==="review").sort((a,b)=>Number(isOverdue(b))-Number(isOverdue(a))).slice(0,6).map(d=><button key={d.id} onClick={()=>void openDoc(d)} className="flex w-full items-center gap-3 py-3 text-left hover:bg-slate-50"><div className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><FileText size={16}/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-[10px] font-extrabold text-slate-500">{d.stdCode}</span><Status value={d.status}/>{isOverdue(d)&&<span className="text-[10px] font-bold text-rose-700">Terlambat</span>}</div><p className="mt-1 truncate text-sm font-semibold text-slate-800">{d.title}</p><p className="text-[11px] text-slate-500">{percent(d)}% checklist · {d.pic||"PIC belum ditetapkan"}</p></div><ChevronRight size={16} className="text-slate-400"/></button>)}{documents.every(d=>d.status!=="block"&&!isOverdue(d)&&d.status!=="review")&&<p className="py-8 text-center text-xs text-slate-500">Belum ada item prioritas.</p>}</div></div>
+   <div className="pmkp-card p-5"><div className="flex items-center gap-2"><Activity size={17} className="text-emerald-700"/><h2 className="text-base font-extrabold text-slate-900">Aktivitas terbaru</h2></div><div className="mt-4 space-y-4">{(stats.activities||[]).slice(0,6).map(a=><div key={a.id} className="flex gap-3"><span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500"/><div><p className="text-xs leading-5 text-slate-700">{a.message}</p><p className="mt-1 text-[10px] text-slate-400">{a.actor} · {dateText(a.createdAt)}</p></div></div>)}{(!stats.activities||!stats.activities.length)&&<p className="py-6 text-center text-xs text-slate-500">Aktivitas akan dicatat ketika item diperbarui.</p>}</div><button onClick={()=>setTab("activity")} className="mt-4 text-xs font-bold text-emerald-800">Lihat seluruh aktivitas →</button></div></section>
+  </div>}
 
-function isOverdue(doc: PmkpDocument) {
-  return Boolean(doc.dueDate && new Date(doc.dueDate).getTime() < Date.now() && doc.status !== "done");
-}
+  {tab==="playbook"&&<section className="mt-5 space-y-4"><div className="pmkp-card p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-extrabold text-slate-900">Checklist Playbook STARKES</h2><p className="mt-1 text-xs leading-5 text-slate-500">Daftar dipaginasi agar tetap ringkas. Pilih item untuk melihat EP, rencana, checklist bukti, dan dokumen terlampir.</p></div><button onClick={()=>setNewOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3.5 py-2.5 text-xs font-bold text-white"><Plus size={15}/>Item lokal</button></div><div className="mt-4 grid gap-2 md:grid-cols-[minmax(180px,1fr)_180px_160px_160px]"><label className="relative"><Search size={15} className="absolute left-3 top-3 text-slate-400"/><input aria-label="Cari playbook" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari judul, EP, atau PIC..." className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-emerald-500"/></label><label className="relative"><Filter size={14} className="absolute left-3 top-3 text-slate-400"/><select aria-label="Filter standar" value={standardFilter} onChange={e=>setStandardFilter(e.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-2 text-xs font-semibold">{[<option key="all" value="all">Semua standar</option>,...standards.map(s=><option key={s.id} value={s.code}>{s.code} — {s.title}</option>)]}</select></label><select aria-label="Filter status" value={statusFilter} onChange={e=>setStatusFilter(e.target.value as "all"|StatusKey)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold"><option value="all">Semua status</option>{order.map(s=><option key={s} value={s}>{labels[s]}</option>)}</select><select aria-label="Filter prioritas" value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value as "all"|Priority)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold"><option value="all">Semua prioritas</option><option>Tinggi</option><option>Sedang</option><option>Rendah</option></select></div><div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>{filtered.length} item ditemukan{activeStandard?" · "+activeStandard.code:""}</span><button onClick={()=>{setQuery("");setStandardFilter("all");setStatusFilter("all");setPriorityFilter("all")}} className="inline-flex items-center gap-1 font-semibold"><X size={13}/>Reset filter</button></div></div>
+   <div className="pmkp-card overflow-hidden"><div className="hidden grid-cols-[minmax(0,1fr)_115px_110px_100px_25px] gap-3 border-b border-slate-100 bg-slate-50/80 px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 md:grid"><span>Item / elemen penilaian</span><span>Status</span><span>Checklist</span><span>PIC / tenggat</span><span/></div><div className="divide-y divide-slate-100">{shown.map(d=><button key={d.id} onClick={()=>void openDoc(d)} className="grid w-full gap-2 px-4 py-3.5 text-left transition hover:bg-emerald-50/30 md:grid-cols-[minmax(0,1fr)_115px_110px_100px_25px] md:items-center md:gap-3 md:px-5"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-600">{d.stdCode}</span>{d.sourcePage&&<span className="text-[10px] text-slate-400">PDF p. {d.sourcePage}</span>}{isOverdue(d)&&<span className="text-[10px] font-bold text-rose-700">Terlambat</span>}</div><p className="mt-1.5 line-clamp-2 text-sm font-bold text-slate-800">{d.title}</p><p className="mt-0.5 line-clamp-1 text-xs text-slate-500">{d.elementAssessment||d.subTopic}</p></div><div className="flex items-center gap-2 md:block"><span className="text-[10px] text-slate-400 md:hidden">Status</span><Status value={d.status}/></div><div><div className="flex justify-between text-[11px]"><span className="font-bold text-slate-700">{percent(d)}%</span><span className="text-slate-400">{d.checkedItems.filter(v=>d.admin.includes(v)).length}/{d.admin.length}</span></div><div className="mt-1.5"><Progress value={percent(d)} height={5}/></div></div><div className="flex items-center gap-2 text-xs text-slate-500 md:block"><span>{d.pic||"PIC belum diisi"}</span><span className="md:mt-1 md:block md:text-[10px]">{d.dueDate?dateText(d.dueDate):"Tanpa tenggat"}</span></div><div className="hidden justify-end md:flex"><ChevronRight size={16} className="text-slate-400"/></div></button>)}{shown.length===0&&<div className="px-6 py-14 text-center"><Search size={23} className="mx-auto text-slate-300"/><p className="mt-2 text-sm font-bold text-slate-700">Tidak ada item yang cocok</p><p className="mt-1 text-xs text-slate-500">Ubah pencarian atau filter.</p></div>}</div><div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3.5 text-xs text-slate-500"><span>Halaman {page} dari {pageCount} · {shown.length} item</span><div className="flex items-center gap-1"><button disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))} aria-label="Sebelumnya" className="rounded-lg border border-slate-200 p-2 disabled:opacity-40"><ChevronLeft size={15}/></button><span className="px-2 font-semibold">{page}/{pageCount}</span><button disabled={page>=pageCount} onClick={()=>setPage(p=>Math.min(pageCount,p+1))} aria-label="Berikutnya" className="rounded-lg border border-slate-200 p-2 disabled:opacity-40"><ChevronRight size={15}/></button></div></div></div>
+  </section>}
 
-export function PmkpDashboard({ standards: initialStandards, documents: initialDocuments, stats: initialStats, displayName = "Komite PMKP" }: Props) {
-  const router = useRouter();
-  const [standards, setStandards] = useState(initialStandards);
-  const [documents, setDocuments] = useState(initialDocuments);
-  const [stats, setStats] = useState(initialStats);
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | StatusKey>("all");
-  const [standardFilter, setStandardFilter] = useState("all");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [activeDoc, setActiveDoc] = useState<PmkpDocument | null>(null);
-  const [form, setForm] = useState<FormState>(initialForm(initialStandards));
+  {tab==="evidence"&&<section className="mt-5 space-y-4"><div className="pmkp-card flex flex-wrap items-center justify-between gap-3 p-5"><div><h2 className="text-lg font-extrabold text-slate-900">Repository dokumen bukti</h2><p className="mt-1 text-xs leading-5 text-slate-500">Berkas disimpan di bucket privat. Preview dan unduh melewati endpoint yang memeriksa sesi pengguna.</p></div><button onClick={()=>void loadAttachmentsForTab()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-700"><RefreshCw size={14}/>Segarkan</button></div><div className="pmkp-card overflow-hidden"><div className="grid grid-cols-[minmax(0,1fr)_110px_75px] gap-3 border-b border-slate-100 bg-slate-50/80 px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:grid-cols-[minmax(0,1fr)_145px_130px_85px] sm:px-5"><span>Nama berkas / item</span><span>Kategori bukti</span><span className="hidden sm:block">Pengunggah / waktu</span><span>Aksi</span></div><div className="divide-y divide-slate-100">{allAttachments.map(a=><div key={a.id} className="grid grid-cols-[minmax(0,1fr)_110px_75px] gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_145px_130px_85px] sm:items-center sm:px-5"><div className="flex min-w-0 items-start gap-3"><div className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><FileText size={16}/></div><div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-800">{a.filename}</p><p className="mt-1 text-[11px] leading-4 text-slate-500">{a.document?.stdCode||"—"} · {a.document?.title||"Item tidak diketahui"}</p><p className="mt-1 text-[10px] text-slate-400">{fileSize(a.fileSize)} · {a.mimeType||"jenis tak diketahui"}</p></div></div><span className="self-start rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-semibold leading-4 text-slate-600">{a.evidenceLabel||"Lampiran umum"}</span><div className="hidden sm:block"><p className="text-xs font-medium text-slate-700">{a.uploadedBy}</p><p className="mt-1 text-[10px] text-slate-400">{dateText(a.createdAt)}</p></div><div className="flex items-center gap-1"><a href={attachmentUrl(a,true)} target="_blank" rel="noreferrer" title="Lihat" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:text-emerald-800"><Eye size={14}/></a><a href={attachmentUrl(a,false)} title="Unduh" className="rounded-lg border border-slate-200 p-2 text-slate-600"><ArrowDownToLine size={14}/></a></div></div>)}{!allAttachments.length&&<div className="px-6 py-14 text-center"><FolderOpen size={26} className="mx-auto text-slate-300"/><p className="mt-2 text-sm font-bold text-slate-700">Belum ada dokumen diunggah</p><p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">Buka item melalui Checklist Playbook, pilih kategori bukti, lalu unggah file.</p><button onClick={()=>setTab("playbook")} className="mt-4 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white">Buka checklist</button></div>}</div></div></section>}
 
-  const filtered = useMemo(() => documents.filter((doc) => {
-    const text = query.trim().toLocaleLowerCase("id-ID");
-    const matchesText = !text || [doc.title, doc.subTopic, doc.stdCode, doc.pic ?? ""].some((value) => value.toLocaleLowerCase("id-ID").includes(text));
-    const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
-    const matchesStandard = standardFilter === "all" || doc.standardId === standardFilter;
-    return matchesText && matchesStatus && matchesStandard;
-  }).sort((a, b) => {
-    const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-    const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
-    return aDue - bDue;
-  }), [documents, query, statusFilter, standardFilter]);
+  {tab==="activity"&&<section className="pmkp-card mt-5 p-5 sm:p-6"><div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-extrabold text-slate-900">Audit trail aktivitas</h2><p className="mt-1 text-xs text-slate-500">Riwayat perubahan status, checklist, unggah bukti, dan catatan item.</p></div><button onClick={()=>void loadActivities()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw size={14}/>Segarkan</button></div><div className="mt-5 divide-y divide-slate-100">{activities.map(a=><div key={a.id} className="flex gap-3 py-4"><div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><Activity size={16}/></div><div className="min-w-0 flex-1"><p className="text-sm font-semibold leading-5 text-slate-800">{a.message}</p><div className="mt-1.5 flex flex-wrap gap-2 text-[11px] text-slate-500"><span className="font-semibold">{a.actor}</span><span>·</span><span>{a.stdCode||"PMKP"}</span><span>·</span><span>{dateText(a.createdAt)}</span></div></div><span className="hidden rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600 sm:inline-flex">{a.action}</span></div>)}{!activities.length&&<div className="py-12 text-center text-sm text-slate-500">Belum ada aktivitas tercatat.</div>}</div></section>}
 
-  async function refresh() {
-    setBusy(true);
-    setMessage("");
-    try {
-      const responses = await Promise.all([
-        fetch("/api/standards?ts=" + Date.now(), { cache: "no-store" }),
-        fetch("/api/documents?ts=" + Date.now(), { cache: "no-store" }),
-        fetch("/api/stats?ts=" + Date.now(), { cache: "no-store" }),
-      ]);
-      const payloads = await Promise.all(responses.map((response) => response.json()));
-      const failed = responses.findIndex((response, index) => !response.ok || payloads[index].status !== "success");
-      if (failed >= 0) throw new Error("Sebagian data gagal dimuat. Periksa koneksi database dan sesi login.");
-      setStandards(payloads[0].data);
-      setDocuments(payloads[1].data);
-      setStats(payloads[2].data);
-      setMessage("Data berhasil diperbarui.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gagal memuat data.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  <footer className="mt-6 flex flex-wrap justify-between gap-2 px-1 text-[10px] leading-4 text-slate-400"><span>Playbook STARKES PMKP · halaman sumber tercantum pada setiap item.</span><span>Progres aplikasi bukan keputusan pemenuhan akreditasi.</span></footer>
+ </section></div>
 
-  function openCreate() {
-    setActiveDoc(null);
-    setForm(initialForm(standards));
-    setMessage("");
-    setDialogOpen(true);
-  }
+ {notice&&<div role="status" className={"fixed bottom-5 right-5 z-[90] flex max-w-[calc(100vw-2rem)] items-start gap-2 rounded-2xl border bg-white px-4 py-3 shadow-xl "+(notice.error?"border-rose-200 text-rose-800":"border-emerald-200 text-emerald-900")}><span className="mt-0.5">{notice.error?<AlertTriangle size={16}/>:<CheckCircle2 size={16}/>}</span><p className="text-xs font-semibold">{notice.message}</p><button aria-label="Tutup notifikasi" onClick={()=>setNotice(null)} className="ml-1 text-slate-400"><X size={14}/></button></div>}
 
-  function openEdit(doc: PmkpDocument) {
-    setActiveDoc(doc);
-    setForm(initialForm(standards, doc));
-    setMessage("");
-    setDialogOpen(true);
-  }
+ {activeDoc&&<div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px]" onMouseDown={e=>{if(e.target===e.currentTarget)setSelectedId(null)}}><section role="dialog" aria-modal="true" aria-labelledby="pmkp-detail-title" className="pmkp-scroll flex h-full w-full max-w-[760px] flex-col overflow-y-auto bg-white shadow-2xl">
+  <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-7"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-extrabold text-emerald-800">{activeDoc.stdCode}</span>{activeDoc.sourcePage&&<span className="text-[10px] text-slate-400">Sumber PDF halaman {activeDoc.sourcePage}</span>}</div><h2 id="pmkp-detail-title" className="mt-2 text-lg font-extrabold leading-6 text-slate-900 sm:text-xl">{activeDoc.title}</h2><p className="mt-1 text-xs text-slate-500">{activeDoc.standard?.title||"Standar PMKP"} · Elemen {activeDoc.elementCode||activeDoc.stdCode.slice(-1)}</p></div><button onClick={()=>setSelectedId(null)} aria-label="Tutup detail" className="rounded-xl border border-slate-200 p-2 text-slate-600"><X size={16}/></button></div><div className="mt-4 grid grid-cols-[1fr_auto] items-center gap-3"><div><div className="flex justify-between text-xs"><span className="font-semibold text-slate-500">Progres checklist</span><span className="font-extrabold text-slate-900">{percent(activeDoc)}%</span></div><div className="mt-2"><Progress value={percent(activeDoc)} height={8}/></div></div><Status value={activeDoc.status}/></div></div>
+  <div className="space-y-5 px-5 py-5 sm:px-7">
+   <section className="rounded-2xl border border-slate-200 bg-slate-50/75 p-4"><div className="flex items-center gap-2"><BookOpen size={16} className="text-emerald-700"/><h3 className="text-sm font-extrabold text-slate-800">Acuan Playbook</h3></div>{activeDoc.elementAssessment&&<div className="mt-3"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Elemen penilaian</p><p className="mt-1.5 text-sm leading-6 text-slate-700">{activeDoc.elementAssessment}</p></div>}{activeDoc.regulationRecommendation&&<div className="mt-3 border-t border-slate-200 pt-3"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rekomendasi regulasi</p><p className="mt-1.5 text-xs leading-5 text-slate-600">{activeDoc.regulationRecommendation}</p></div>}{activeDoc.programWork&&<div className="mt-3 border-t border-slate-200 pt-3"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Usulan kegiatan program kerja</p><p className="mt-1.5 text-xs leading-5 text-slate-600">{activeDoc.programWork}</p></div>}{activeDoc.implementationActivity&&<div className="mt-3 border-t border-slate-200 pt-3"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Aktivitas implementasi</p><p className="mt-1.5 text-xs leading-5 text-slate-600">{activeDoc.implementationActivity}</p></div>}{activeDoc.supportingFacilities&&<div className="mt-3 border-t border-slate-200 pt-3"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fasilitas pendukung yang direkomendasikan</p><p className="mt-1.5 text-xs leading-5 text-slate-600">{activeDoc.supportingFacilities}</p></div>}</section>
+   <section><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-extrabold text-slate-900">Checklist bukti administratif</h3><p className="mt-1 text-xs leading-5 text-slate-500">Centang sesudah bukti diperiksa. Lampiran disambungkan berdasarkan kategori.</p></div><span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">{activeDoc.checkedItems.filter(v=>activeDoc.admin.includes(v)).length}/{activeDoc.admin.length}</span></div><div className="mt-3 space-y-2">{activeDoc.admin.map((item,i)=>{const checked=activeDoc.checkedItems.includes(item);const matching=attachments.filter(a=>a.evidenceLabel===item);return <div key={item} className={"rounded-xl border p-3 "+(checked?"border-emerald-200 bg-emerald-50/55":"border-slate-200 bg-white")}><label className="flex cursor-pointer items-start gap-3"><input type="checkbox" checked={checked} disabled={busy} onChange={()=>void toggleChecklist(activeDoc,item)} className="mt-0.5 size-4 accent-emerald-700"/><span className="min-w-0 flex-1"><span className="block text-xs font-semibold leading-5 text-slate-700">{item}</span><span className="mt-1 block text-[10px] text-slate-400">Checklist {i+1} · {matching.length?matching.length+" lampiran":"belum ada lampiran"}</span></span>{checked?<CheckCircle2 size={17} className="text-emerald-700"/>:<Circle size={17} className="text-slate-300"/>}</label>{matching.length>0&&<div className="ml-7 mt-2 space-y-1.5">{matching.map(a=><div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2"><span className="break-words text-[11px] font-medium text-slate-700"><FileCheck2 size={13} className="mr-1 inline text-emerald-700"/>{a.filename} <span className="text-slate-400">({fileSize(a.fileSize)})</span></span><span className="flex gap-1"><a href={attachmentUrl(a,true)} target="_blank" rel="noreferrer" title="Pratinjau" className="rounded-md border border-slate-200 p-1.5"><Eye size={13}/></a><a href={attachmentUrl(a,false)} title="Unduh" className="rounded-md border border-slate-200 p-1.5"><ArrowDownToLine size={13}/></a></span></div>)}</div>}</div>})}</div><div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3.5 py-3"><p className="max-w-md text-[11px] leading-5 text-slate-500">Checklist lengkap bukan keputusan akreditasi; evaluator tetap memeriksa kecukupan bukti dan pemenuhan kriteria.</p>{activeDoc.admin.length>0&&activeDoc.checkedItems.filter(v=>activeDoc.admin.includes(v)).length===activeDoc.admin.length?<span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700"><CheckCircle2 size={14}/>Lengkap</span>:<span className="text-[11px] font-semibold text-slate-500">{activeDoc.admin.length-activeDoc.checkedItems.filter(v=>activeDoc.admin.includes(v)).length} belum diverifikasi</span>}</div></section>
+   <section className="rounded-2xl border border-slate-200 p-4"><div className="flex items-center gap-2"><Upload size={16} className="text-emerald-700"/><h3 className="text-sm font-extrabold text-slate-900">Unggah dokumen bukti</h3></div><p className="mt-1 text-xs leading-5 text-slate-500">PDF, Office, CSV, TXT, PNG atau JPEG; maksimal 20 MB. File tetap privat.</p><form onSubmit={uploadEvidence} className="mt-3 space-y-3"><label className="block text-xs font-semibold text-slate-700">Kategori bukti<select required value={uploadLabel} onChange={e=>setUploadLabel(e.target.value)} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal"><option value="">Pilih checklist</option>{activeDoc.admin.map(v=><option key={v} value={v}>{v}</option>)}<option value="Lampiran umum">Lampiran umum</option></select></label><label className="block cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center hover:border-emerald-400"><input id="pmkp-file" type="file" className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.png,.jpg,.jpeg" onChange={(e:ChangeEvent<HTMLInputElement>)=>setFile(e.target.files?.[0]||null)}/><Upload size={19} className="mx-auto text-slate-400"/><span className="mt-2 block break-words text-xs font-bold text-slate-700">{file?file.name:"Pilih berkas untuk diunggah"}</span><span className="mt-1 block text-[10px] text-slate-400">{file?fileSize(file.size):"Klik area ini · maksimal 20 MB"}</span></label><button disabled={uploadBusy||!file||!uploadLabel} type="submit" className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-bold text-white disabled:opacity-50">{uploadBusy?<Loader2 size={15} className="animate-spin"/>:<FilePlus2 size={15}/>} {uploadBusy?"Mengunggah…":"Unggah ke repository privat"}</button></form></section>
+   <form onSubmit={saveEdit} className="rounded-2xl border border-slate-200 p-4"><div className="flex items-center gap-2"><SlidersHorizontal size={16} className="text-emerald-700"/><h3 className="text-sm font-extrabold text-slate-900">Status dan penanggung jawab</h3></div><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-slate-700">PIC / unit<input value={edit?.pic||""} onChange={e=>setEdit(v=>v?({...v,pic:e.target.value}):v)} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-normal" placeholder="Nama / unit kerja"/></label><label className="text-xs font-semibold text-slate-700">Status<select value={edit?.status||activeDoc.status} onChange={e=>setEdit(v=>v?({...v,status:e.target.value as StatusKey}):v)} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal">{order.map(s=><option key={s} value={s}>{labels[s]}</option>)}</select></label><label className="text-xs font-semibold text-slate-700">Prioritas<select value={edit?.priority||activeDoc.priority} onChange={e=>setEdit(v=>v?({...v,priority:e.target.value as Priority}):v)} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal"><option>Tinggi</option><option>Sedang</option><option>Rendah</option></select></label><label className="text-xs font-semibold text-slate-700">Tenggat<input type="date" value={edit?.dueDate||""} onChange={e=>setEdit(v=>v?({...v,dueDate:e.target.value}):v)} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-normal"/></label><label className="text-xs font-semibold text-slate-700 sm:col-span-2">Catatan internal<textarea rows={3} value={edit?.notes||""} onChange={e=>setEdit(v=>v?({...v,notes:e.target.value}):v)} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-normal" placeholder="Hambatan, keputusan rapat, tindak lanjut…"/></label></div><div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3"><Priority value={activeDoc.priority}/><button disabled={busy} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{busy?<Loader2 size={14} className="animate-spin"/>:<Check size={14}/>}Simpan perubahan</button></div></form>
+   <section className="pb-4"><div className="flex items-center gap-2"><Clock3 size={16} className="text-slate-500"/><h3 className="text-sm font-extrabold text-slate-900">Jejak aktivitas item</h3></div><div className="mt-3 space-y-3">{detailActivities.slice(0,10).map(a=><div key={a.id} className="flex gap-2.5"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-emerald-600"/><div><p className="text-xs leading-5 text-slate-700">{a.message}</p><p className="mt-0.5 text-[10px] text-slate-400">{a.actor} · {dateText(a.createdAt)}</p></div></div>)}{detailActivities.length===0&&<p className="text-xs text-slate-500">Belum ada aktivitas untuk item ini.</p>}</div></section>
+  </div></section></div>}
 
-  async function saveDocument(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setMessage("");
-    const payload = {
-      stdCode: form.stdCode.trim(),
-      standardId: form.standardId,
-      subTopic: form.subTopic.trim(),
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      pic: form.pic.trim() || null,
-      status: form.status,
-      progress: form.status === "done" ? 100 : Number(form.progress),
-      priority: form.priority,
-      dueDate: form.dueDate ? new Date(form.dueDate + "T00:00:00.000Z").toISOString() : null,
-    };
-    try {
-      const response = await fetch(activeDoc ? "/api/documents/" + activeDoc.id : "/api/documents", {
-        method: activeDoc ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok || result.status !== "success") throw new Error(result.message || "Dokumen tidak dapat disimpan.");
-      setDialogOpen(false);
-      await refresh();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Dokumen tidak dapat disimpan.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function changeStatus(doc: PmkpDocument, status: StatusKey) {
-    const progress = status === "done" ? 100 : status === "todo" ? 0 : Math.max(25, doc.progress);
-    setBusy(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/documents/" + doc.id, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, progress }),
-      });
-      const result = await response.json();
-      if (!response.ok || result.status !== "success") throw new Error(result.message || "Status tidak dapat diperbarui.");
-      await refresh();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Status tidak dapat diperbarui.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function exportCsv() {
-    const headings = ["Standar", "Kode", "Judul", "Subtopik", "Status", "Progres", "Prioritas", "PIC", "Tenggat"];
-    const values = filtered.map((doc) => [doc.standard?.title ?? doc.stdCode, doc.stdCode, doc.title, doc.subTopic, statusLabels[doc.status], String(doc.progress), doc.priority, doc.pic ?? "", doc.dueDate ?? "" ]);
-    const escape = (value: string) => "\"" + value.replace(/"/g, "\"\"") + "\"";
-    const csv = [headings, ...values].map((line) => line.map(escape).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "komite-pmkp-" + new Date().toISOString().slice(0, 10) + ".csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
-    router.refresh();
-  }
-
-  const doneCount = stats.byStatus.done ?? 0;
-  const percentDone = stats.total ? Math.round((doneCount / stats.total) * 100) : 0;
-
-  return (
-    <main className="pmkp-bg min-h-screen">
-      <header className="sticky top-0 z-30 border-b border-white/70 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-900/15"><ShieldCheck size={22}/></div>
-            <div><div className="font-bold tracking-tight text-slate-900">Komite PMKP</div><div className="text-xs text-slate-500">Peningkatan Mutu & Keselamatan Pasien</div></div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-slate-600 sm:inline">Halo, {displayName}</span>
-            <button onClick={refresh} disabled={busy} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"><RefreshCw size={15} className={busy ? "animate-spin" : ""}/><span className="hidden sm:inline">Muat ulang</span></button>
-            <button onClick={logout} className="grid size-9 place-items-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50" title="Keluar" aria-label="Keluar"><LogOut size={16}/></button>
-          </div>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-7 sm:px-6 lg:py-9">
-        <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600 p-6 text-white shadow-xl shadow-emerald-900/10 sm:p-9">
-          <div className="grid gap-8 lg:grid-cols-[1.4fr_.6fr] lg:items-center">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide"><Activity size={14}/> DASHBOARD MUTU RUMAH SAKIT</div>
-              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Dokumen yang tertata.<br className="hidden sm:block"/> Mutu yang dapat dipantau.</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-50 sm:text-base">Kelola dokumen, penanggung jawab, tenggat, dan tindak lanjut PMKP secara terukur. Basis data operasional dimulai tanpa dokumen simulasi.</p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button onClick={openCreate} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-50"><FilePlus2 size={17}/> Tambah dokumen</button>
-                <button onClick={exportCsv} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15"><Download size={17}/> Ekspor CSV</button>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur-sm">
-              <div className="text-sm font-medium text-emerald-50">Penyelesaian dokumen</div>
-              <div className="mt-2 flex items-end gap-2"><span className="text-5xl font-bold tracking-tight">{percentDone}%</span><span className="mb-1 text-sm text-emerald-100">{doneCount} dari {stats.total}</span></div>
-              <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-emerald-950/30"><div className="h-full rounded-full bg-white transition-all" style={{width: percentDone + "%"}}/></div>
-              <div className="mt-3 text-xs text-emerald-100">Persentase = dokumen selesai / total dokumen.</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <article className="pmkp-card p-5"><div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500">Total dokumen</span><ClipboardList className="text-emerald-600" size={20}/></div><div className="mt-3 text-3xl font-bold text-slate-900">{stats.total}</div><div className="mt-1 text-xs text-slate-500">Dokumen dalam register PMKP</div></article>
-          <article className="pmkp-card p-5"><div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500">Selesai</span><CheckCircle2 className="text-emerald-600" size={20}/></div><div className="mt-3 text-3xl font-bold text-slate-900">{stats.byStatus.done}</div><div className="mt-1 text-xs text-slate-500">Status selesai dan tervalidasi tim</div></article>
-          <article className="pmkp-card p-5"><div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500">Rata-rata progres</span><Activity className="text-sky-600" size={20}/></div><div className="mt-3 text-3xl font-bold text-slate-900">{stats.avgProgress}%</div><div className="mt-1 text-xs text-slate-500">Rata-rata progres per dokumen</div></article>
-          <article className="pmkp-card p-5"><div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500">Lewat tenggat</span><AlertTriangle className={stats.overdue ? "text-rose-600" : "text-slate-400"} size={20}/></div><div className="mt-3 text-3xl font-bold text-slate-900">{stats.overdue}</div><div className="mt-1 text-xs text-slate-500">Belum selesai dan tanggal tenggat terlewati</div></article>
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-xl font-bold tracking-tight text-slate-900">Standar PMKP</h2><p className="mt-1 text-sm text-slate-500">Pilih standar untuk memfilter dokumen pada tabel.</p></div><div className="text-xs text-slate-500">{standards.length} standar terdaftar</div></div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {standards.map((standard) => (
-              <button key={standard.id} onClick={() => setStandardFilter(standardFilter === standard.id ? "all" : standard.id)} className={"pmkp-card p-4 text-left transition hover:-translate-y-0.5 " + (standardFilter === standard.id ? "ring-2 ring-emerald-500" : "")}>
-                <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wider text-emerald-700">{standard.code}</div><div className="mt-1 font-semibold text-slate-800">{standard.title}</div></div><div className="grid size-9 shrink-0 place-items-center rounded-xl bg-emerald-50 text-sm font-bold text-emerald-700">{standard.stats.total}</div></div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{width: standard.stats.pct + "%"}}/></div>
-                <div className="mt-2 flex justify-between text-xs text-slate-500"><span>{standard.stats.done} selesai</span><span>{standard.stats.pct}% progres</span></div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="pmkp-card overflow-hidden">
-          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-100 p-5 sm:p-6">
-            <div><h2 className="text-xl font-bold tracking-tight text-slate-900">Register dokumen</h2><p className="mt-1 text-sm text-slate-500">Cari, filter, perbarui status, dan buka rincian dokumen.</p></div>
-            <button onClick={openCreate} className="inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700"><FilePlus2 size={16}/> Tambah dokumen</button>
-          </div>
-          <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-[minmax(220px,1fr)_200px_220px] sm:p-5">
-            <label className="relative block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Cari judul, kode, subtopik, PIC…" className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"/></label>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | StatusKey)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500"><option value="all">Semua status</option>{Object.entries(statusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select>
-            <select value={standardFilter} onChange={(e)=>setStandardFilter(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500"><option value="all">Semua standar</option>{standards.map((standard)=><option key={standard.id} value={standard.id}>{standard.code} — {standard.title}</option>)}</select>
-          </div>
-          {message && <div role="status" className="border-b border-slate-100 bg-slate-50 px-5 py-3 text-sm text-slate-600">{message}</div>}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-semibold">Dokumen</th><th className="px-4 py-3 font-semibold">Standar</th><th className="px-4 py-3 font-semibold">PIC</th><th className="px-4 py-3 font-semibold">Progres</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Tenggat</th><th className="px-4 py-3 font-semibold">Aksi</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-emerald-50/30">
-                    <td className="max-w-[340px] px-5 py-4"><button onClick={() => openEdit(doc)} className="text-left font-semibold text-slate-800 hover:text-emerald-700">{doc.title}</button><div className="mt-1 text-xs text-slate-500">{doc.stdCode} · {doc.subTopic}</div></td>
-                    <td className="px-4 py-4 text-slate-600">{doc.standard?.code ?? doc.stdCode}</td>
-                    <td className="px-4 py-4 text-slate-600">{doc.pic || "Belum ditugaskan"}</td>
-                    <td className="px-4 py-4"><div className="flex items-center gap-2"><div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{width: doc.progress + "%"}}/></div><span className="text-xs font-semibold tabular-nums text-slate-600">{doc.progress}%</span></div></td>
-                    <td className="px-4 py-4"><select aria-label={"Status " + doc.title} value={doc.status} disabled={busy} onChange={(e)=>changeStatus(doc,e.target.value as StatusKey)} className={"max-w-[165px] rounded-full border-0 px-2.5 py-1.5 text-xs font-semibold outline-none " + statusClasses[doc.status]}>{Object.entries(statusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></td>
-                    <td className="px-4 py-4"><span className={isOverdue(doc) ? "font-semibold text-rose-600" : "text-slate-600"}>{dateLabel(doc.dueDate)}</span>{isOverdue(doc)&&<div className="mt-1 text-[11px] text-rose-500">Lewat tenggat</div>}</td>
-                    <td className="px-4 py-4"><button onClick={()=>openEdit(doc)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700">Detail / Edit</button></td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && <tr><td colSpan={7} className="px-6 py-16 text-center"><div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><ClipboardList size={23}/></div><div className="font-semibold text-slate-800">{documents.length === 0 ? "Register masih kosong" : "Dokumen tidak ditemukan"}</div><p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{documents.length === 0 ? "Data simulasi tidak digunakan. Mulai dengan memasukkan dokumen PMKP yang telah diverifikasi." : "Coba ubah kata kunci atau filter yang digunakan."}</p>{documents.length === 0 && <button onClick={openCreate} className="mt-4 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">Tambah dokumen pertama</button>}</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3 text-xs text-slate-500"><span>Menampilkan {filtered.length} dari {documents.length} dokumen</span><span>Terakhir diperbarui sesuai respons database</span></div>
-        </section>
-      </div>
-
-      {dialogOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" role="presentation" onMouseDown={(e)=>{if(e.target===e.currentTarget)setDialogOpen(false);}}>
-          <section role="dialog" aria-modal="true" aria-labelledby="document-form-title" className="my-4 w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-slate-100 px-6 py-5"><h2 id="document-form-title" className="text-xl font-bold text-slate-900">{activeDoc ? "Perbarui dokumen" : "Tambah dokumen PMKP"}</h2><p className="mt-1 text-sm text-slate-500">Lengkapi data sesuai dokumen yang sudah diverifikasi.</p></div>
-            <form onSubmit={saveDocument} className="space-y-4 p-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-medium text-slate-700">Standar<select required value={form.standardId} onChange={(e)=>{const selected=standards.find((item)=>item.id===e.target.value);setForm((current)=>({...current,standardId:e.target.value,stdCode:activeDoc?current.stdCode:((selected?.code??"PMKP 1")+"a")}));}} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 font-normal outline-none focus:border-emerald-500"><option value="" disabled>Pilih standar</option>{standards.map((standard)=><option key={standard.id} value={standard.id}>{standard.code} — {standard.title}</option>)}</select></label>
-                <label className="text-sm font-medium text-slate-700">Kode dokumen<input required value={form.stdCode} onChange={(e)=>setForm({...form,stdCode:e.target.value})} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-emerald-500" placeholder="Contoh: PMKP 1a"/></label>
-                <label className="text-sm font-medium text-slate-700 sm:col-span-2">Judul dokumen<input required value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-emerald-500" placeholder="Nama dokumen atau bukti pemenuhan"/></label>
-                <label className="text-sm font-medium text-slate-700 sm:col-span-2">Elemen / subtopik<input required value={form.subTopic} onChange={(e)=>setForm({...form,subTopic:e.target.value})} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-emerald-500" placeholder="Elemen penilaian atau subtopik"/></label>
-                <label className="text-sm font-medium text-slate-700">Penanggung jawab (PIC)<input value={form.pic} onChange={(e)=>setForm({...form,pic:e.target.value})} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-emerald-500" placeholder="Nama / unit kerja"/></label>
-                <label className="text-sm font-medium text-slate-700">Tenggat<input type="date" value={form.dueDate} onChange={(e)=>setForm({...form,dueDate:e.target.value})} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-emerald-500"/></label>
-                <label className="text-sm font-medium text-slate-700">Status<select value={form.status} onChange={(e)=>setForm({...form,status:e.target.value as StatusKey,progress:e.target.value==="done"?100:e.target.value==="todo"?0:form.progress})} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 font-normal outline-none focus:border-emerald-500">{Object.entries(statusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-                <label className="text-sm font-medium text-slate-700">Prioritas<select value={form.priority} onChange={(e)=>setForm({...form,priority:e.target.value as Priority})} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 font-normal outline-none focus:border-emerald-500"><option>Tinggi</option><option>Sedang</option><option>Rendah</option></select></label>
-                <label className="text-sm font-medium text-slate-700 sm:col-span-2">Deskripsi / catatan konteks<textarea rows={3} value={form.description} onChange={(e)=>setForm({...form,description:e.target.value})} className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-emerald-500" placeholder="Tujuan, cakupan, atau bukti yang diperlukan"/></label>
-                <label className="text-sm font-medium text-slate-700 sm:col-span-2">Progres: {form.status === "done" ? 100 : form.progress}%<input type="range" min={0} max={100} step={5} disabled={form.status==="done"} value={form.status==="done"?100:form.progress} onChange={(e)=>setForm({...form,progress:Number(e.target.value),status:Number(e.target.value)===100?"done":form.status==="done"?"prog":form.status})} className="mt-2 block w-full accent-emerald-600"/></label>
-              </div>
-              {message && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{message}</p>}
-              <div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={()=>setDialogOpen(false)} className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">Batal</button><button disabled={busy || !form.standardId} type="submit" className="h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">{busy ? "Menyimpan…" : activeDoc ? "Simpan perubahan" : "Simpan dokumen"}</button></div>
-            </form>
-          </section>
-        </div>
-      )}
-    </main>
-  );
+ {newOpen&&<div className="fixed inset-0 z-[60] grid place-items-center overflow-y-auto bg-slate-950/45 p-4 backdrop-blur-sm" onMouseDown={e=>{if(e.target===e.currentTarget)setNewOpen(false)}}><section role="dialog" aria-modal="true" aria-labelledby="new-title" className="my-4 w-full max-w-xl rounded-2xl bg-white shadow-2xl"><div className="flex items-start justify-between border-b border-slate-100 px-5 py-4"><div><h2 id="new-title" className="text-lg font-extrabold text-slate-900">Tambah item kerja</h2><p className="mt-1 text-xs text-slate-500">Item lokal tambahan; tidak mengubah daftar Playbook sumber.</p></div><button onClick={()=>setNewOpen(false)} aria-label="Tutup form" className="rounded-lg p-2 text-slate-500"><X size={16}/></button></div><form onSubmit={createItem} className="space-y-4 p-5"><label className="block text-xs font-semibold text-slate-700">Standar<select required value={newForm.standardId} onChange={e=>setNewForm(v=>({...v,standardId:e.target.value}))} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal">{standards.map(s=><option key={s.id} value={s.id}>{s.code} — {s.title}</option>)}</select></label><div className="grid gap-3 sm:grid-cols-[130px_1fr]"><label className="text-xs font-semibold text-slate-700">Elemen penilaian<select value={newForm.ep} onChange={e=>setNewForm(v=>({...v,ep:e.target.value}))} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal">{["a","b","c","d","e","f","g"].map(v=><option key={v}>{v}</option>)}</select></label><label className="text-xs font-semibold text-slate-700">Judul item<input required maxLength={300} value={newForm.title} onChange={e=>setNewForm(v=>({...v,title:e.target.value}))} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-normal" placeholder="Aktivitas tambahan"/></label></div><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold text-slate-700">PIC / unit<input value={newForm.pic} onChange={e=>setNewForm(v=>({...v,pic:e.target.value}))} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-normal"/></label><label className="text-xs font-semibold text-slate-700">Tenggat<input type="date" value={newForm.dueDate} onChange={e=>setNewForm(v=>({...v,dueDate:e.target.value}))} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-normal"/></label></div><label className="block text-xs font-semibold text-slate-700">Deskripsi<textarea rows={3} value={newForm.description} onChange={e=>setNewForm(v=>({...v,description:e.target.value}))} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-normal"/></label><div className="flex justify-end gap-2 border-t border-slate-100 pt-4"><button type="button" onClick={()=>setNewOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600">Batal</button><button disabled={busy} type="submit" className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{busy?<Loader2 size={14}/>:<Plus size={14}/>}Simpan item</button></div></form></section></div>}
+ </main>;
 }

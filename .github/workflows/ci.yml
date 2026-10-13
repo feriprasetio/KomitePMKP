@@ -1,0 +1,40 @@
+name: PMKP release validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pmkp-ci-main
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
+      AUTH_SECRET: ci-only-not-a-production-secret-at-least-32-chars
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-only-placeholder
+      ADMIN_USERNAME: superadmin
+      ADMIN_NAME: Komite PMKP
+      ADMIN_INITIAL_PASSWORD: ci-only-temporary-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Type-check
+        run: npm run check
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build

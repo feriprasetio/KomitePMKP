@@ -1,43 +1,34 @@
-# Komite PMKP
+# Dokumen Akreditasi PMKP
 
-Portal pengelolaan dokumen Peningkatan Mutu dan Keselamatan Pasien.
+Aplikasi kerja internal untuk item Playbook STARKES PMKP, checklist bukti administratif, progres, penanggung jawab dan repository berkas privat.
 
-## Status saat ini
+## Status source dan data
+- Repository: \`feriprasetio/KomitePMKP\`.
+- Database aplikasi: proyek Supabase **Dokumen Akreditasi PMKP**, ref \`brpwisafomtahjupyxyl\`. Database AUREKA tidak digunakan oleh aplikasi ini.
+- Schema, kolom playbook, bucket Storage privat dan seed checklist telah diterapkan pada proyek Supabase PMKP.
+- Seed kerja memuat 146 item di 12 kelompok: PMKP 1, 2, 3, 4, 4.1, 5, 6, 7, 8, 9, 10, dan 11. Halaman sumber PDF disimpan per item.
+- Deskripsi kegiatan merupakan ringkasan untuk membantu kerja. Periksa isi pada halaman PDF yang dirujuk serta regulasi rumah sakit sebelum digunakan sebagai bukti formal; progres aplikasi tidak menggantikan penilaian evaluator.
 
-- Source aplikasi Next.js, endpoint API, autentikasi, dan schema Prisma berada di repository ini.
-- Proyek Supabase khusus Komite PMKP **belum dibuat**. Aplikasi ini tidak menggunakan database proyek AUREKA.
-- Migration khusus PMKP tersedia di repository dan baru boleh diterapkan pada proyek Supabase baru yang telah dikonfirmasi.
-- GitHub Pages hanya menyajikan landing page statis index.html. Pages tidak menjalankan Next.js API, session cookie server, maupun Prisma. Dashboard operasional perlu di-host pada platform yang mendukung Next.js server runtime.
+## Fitur
+- Dashboard ringkas; progress bar per checklist/per standar; pencarian, filter dan pagination.
+- Rincian elemen penilaian, rekomendasi regulasi, usulan program kerja, aktivitas implementasi, fasilitas pendukung dan halaman sumber.
+- Checklist bukti administratif dengan progres berdasar jumlah item yang diverifikasi.
+- Upload, kategori, preview dan download dokumen privat (maks. 20 MB) serta audit trail.
+- Autentikasi sesi httpOnly, bootstrap admin yang wajib mengganti password, dan pembatasan penghapusan untuk superadmin.
 
-## Variabel environment
+## Environment server
+Konfigurasikan nilai aktual melalui secret manager host, bukan source code:
+- \`DATABASE_URL\`: PostgreSQL connection string proyek Supabase PMKP dengan SSL.
+- \`SUPABASE_URL=https://brpwisafomtahjupyxyl.supabase.co\`.
+- \`SUPABASE_SERVICE_ROLE_KEY\`: secret/service-role key khusus server, jangan gunakan publishable/anon key dan jangan letakkan pada \`NEXT_PUBLIC_*\`.
+- \`AUTH_SECRET\`: secret acak minimal 32 karakter.
+- \`ADMIN_USERNAME=superadmin\`, \`ADMIN_NAME=Komite PMKP\`.
+- \`ADMIN_INITIAL_PASSWORD\`: password sementara minimal 12 karakter, wajib diganti setelah login pertama.
 
-Atur variabel berikut pada host aplikasi (bukan di Git):
+Rahasia database dan Storage tidak dimasukkan ke Git. Runtime baru dapat diaktifkan sesudah secret dipasang di host.
 
-- DATABASE_URL: koneksi PostgreSQL dari proyek Supabase khusus Komite PMKP, dengan TLS.
-- AUTH_SECRET: secret acak minimal 32 karakter.
-- ADMIN_USERNAME=superadmin
-- ADMIN_NAME=Komite PMKP
-- ADMIN_INITIAL_PASSWORD: password bootstrap sementara; wajib diganti sesudah login pertama.
+## Lokal dan pemeriksaan
+Gunakan Node.js 20.9+. Isi \`.env\` dari \`.env.example\` pada lingkungan lokal pribadi, kemudian jalankan \`npm install\`, \`npm run db:generate\`, \`npm run dev\`. Untuk release jalankan \`npm run check\`, \`npm run lint\`, dan \`npm run build\`. CI GitHub menjalankan pemeriksaan tersebut pada push/PR.
 
-Akun superadmin belum dibuat pada proyek database baru karena proyek tersebut menunggu konfirmasi pembuatan. Jangan memasukkan password aktual atau connection string ke .env.example, source code, atau variabel berawalan NEXT_PUBLIC_.
-
-## Database
-
-Migration supabase/migrations/20261013000000_komite_pmkp_core_schema.sql menyiapkan tabel PmkpStandard, PmkpDocument, PmkpActivity, PmkpAttachment, dan User. Migration ini belum diterapkan pada proyek PMKP sampai proyek Supabase terpisah dibuat. RLS diaktifkan dan akses langsung dari peran Supabase anon/authenticated ditolak. Aplikasi mengakses database dari server menggunakan DATABASE_URL.
-
-Tidak ada data dokumen, aktivitas, atau lampiran simulasi. Setelah proyek baru tersedia dan variabel environment terpasang, login pertama menyiapkan taksonomi 11 standar sebagai referensi kosong, bukan data dokumen contoh.
-
-## Menjalankan aplikasi
-
-Versi Node.js 20.9 atau lebih baru direkomendasikan.
-
-1. Salin .env.example menjadi .env hanya di lingkungan lokal dan isi nilai rahasia.
-2. Jalankan npm install.
-3. Jalankan npm run dev untuk pengembangan.
-4. Jalankan npm run check, npm run lint, dan npm run build sebelum deployment.
-
-Untuk deployment server, hubungkan repository ke platform Next.js, lalu atur environment variables di dashboard platform dan jalankan build.
-
-## Catatan produksi
-
-Lampiran saat ini memakai direktori filesystem. Untuk hosting serverless/multi-instance, pindahkan lampiran ke Supabase Storage private bucket sebelum digunakan untuk menyimpan bukti operasional. Setelah deployment, uji login, penggantian password, CRUD, akses tanpa sesi, dan unduh lampiran.
+## Hosting
+GitHub Pages hanya menyajikan landing page statis, bukan Next.js API, autentikasi, Prisma atau Storage privat. Aplikasi operasional harus di-host pada platform yang mendukung runtime server Next.js dan mendapat environment variables di atas. Uji login, CRUD, akses tanpa sesi, upload, preview serta penghapusan berkas sebelum pemakaian operasional.
