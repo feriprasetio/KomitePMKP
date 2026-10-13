@@ -84,7 +84,7 @@ const EP_CRITERIA={
 "11-E":"Program manajemen risiko tingkat rumah sakit disusun untuk ditetapkan Direktur.",
 "11-F":"Minimal satu proses berisiko tinggi dipilih untuk analisis proaktif FMEA setiap tahun."
 };
-let user=null,docs=[],attachments=[],activities=[],invites=[],activePage="dashboard",selectedDoc=null,searchText="",taskFilter={std:"all",status:"all"},repoFilter="all",modalTab="checklist",loading=false,seedCache=null;
+let user=null,standards=[],docs=[],attachments=[],activities=[],invites=[],activePage="dashboard",selectedDoc=null,searchText="",taskFilter={std:"all",status:"all"},repoFilter="all",modalTab="checklist",loading=false,seedCache=null;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const initials=s=>(String(s||"PM").trim().split(/\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase()||"PM");
