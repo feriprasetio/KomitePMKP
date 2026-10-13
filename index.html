@@ -124,7 +124,7 @@ function allChecklistItems(d){
  {id:"facility",title:"Fasilitas pendukung",items:preferredDocs(d.pendukungDocs,d.supportingFacilities,"Repository dokumen dan sarana kerja yang relevan.")},
  {id:"verify",title:"Verifikasi dan tindak lanjut",items:["Penanggung jawab menelaah kecukupan dan keterlacakan bukti.","Monitoring/evaluasi, hasil pembelajaran dan rencana tindak lanjut dicatat bila relevan."]}
  ];
- return groups.map(g=>{const counts={};return {id:g.id,title:g.title,items:g.items.map(label=>{const base=normalizeTitle(label).replace(/\s+/g,"-").slice(0,64)||"butir";const n=counts[base]||0;counts[base]=n+1;return {id:g.id+"-"+base+(n?"-"+(n+1):""),label:String(label)}})}});
+ return groups.map(g=>({id:g.id,title:g.title,items:g.items.map((label,i)=>({id:g.id+"-"+i,label:String(label)}))}));
 }
 function checklistStats(d){const items=allChecklistItems(d).flatMap(g=>g.items);const checks=(d.checklistData&&d.checklistData.checks)||{};const done=items.filter(it=>checks[it.id]===true).length;return {total:items.length,done:done,percent:items.length?Math.round(done/items.length*100):0}}
 function statusInfo(d){const p=checklistStats(d).percent;if(p===100)return {key:"done",label:"Selesai"};if(d.status==="review")return {key:"review",label:"Perlu review"};if(p>0)return {key:"progress",label:"Dalam proses"};return {key:"todo",label:"Belum dimulai"}}
@@ -199,11 +199,11 @@ async function ensureSeeded(){
   const page=pdfPageFromPrinted(x.sourcePage);
   const title=normalizeTitle(x.title);
   const candidates=existing.filter(d=>!used.has(d.id)&&normalizeTitle(d.title||d.subTopic)===title&&Number(d.sourcePage)===page);
-  const found=candidates.find(d=>stdCodeById.get(d.standardId)===x.stdCode)||candidates[0];
+  const found=candidates.find(d=>stdCodeById.get(d.standardId)===x.stdCode);
   if(!found){unmatched.push(x);continue}
   used.add(found.id);
   const checks=found.checklistData&&typeof found.checklistData==="object"?found.checklistData:{checks:{},version:1};
-  enriched.push({...found,playbookKey:x.playbookKey,elementCode:String(x.elementCode||found.elementCode||"").toLowerCase(),criterion:x.criterion||found.criterion||"",programSuggestion:x.programSuggestion||found.programSuggestion||"",implementation:x.implementation||found.implementation||"",sourcePage:page,regulasiDocs:x.regulation||found.regulasiDocs||"",adminDocs:x.adminDocs||found.adminDocs||"",pendukungDocs:x.facility||found.pendukungDocs||"",checklistData:checks,updatedAt:timestamp});
+  enriched.push({...found,stdCode:x.stdCode,standardId:stdIdByCode.get(x.stdCode)||found.standardId,playbookKey:x.playbookKey,elementCode:String(x.elementCode||found.elementCode||"").toLowerCase(),criterion:x.criterion||found.criterion||"",programSuggestion:x.programSuggestion||found.programSuggestion||"",implementation:x.implementation||found.implementation||"",sourcePage:page,regulasiDocs:x.regulation||found.regulasiDocs||"",adminDocs:x.adminDocs||found.adminDocs||"",pendukungDocs:x.facility||found.pendukungDocs||"",checklistData:checks,updatedAt:timestamp});
  }
  for(let off=0;off<enriched.length;off+=20){
   const saved=await db.from("PmkpDocument").upsert(enriched.slice(off,off+20),{onConflict:"id"});if(saved.error)throw saved.error;
@@ -211,7 +211,7 @@ async function ensureSeeded(){
  // If the database already contains a Playbook dataset, only add items that cannot
  // be matched by both title and source page; retain all existing IDs and checklist state.
  if(existing.length){
-  const stillMissing=unmatched.filter(x=>!existing.some(d=>normalizeTitle(d.title||d.subTopic)===normalizeTitle(x.title)&&Number(d.sourcePage)===pdfPageFromPrinted(x.sourcePage)));
+  const stillMissing=unmatched.filter(x=>!existing.some(d=>stdCodeById.get(d.standardId)===x.stdCode&&normalizeTitle(d.title||d.subTopic)===normalizeTitle(x.title)&&Number(d.sourcePage)===pdfPageFromPrinted(x.sourcePage)));
   for(let off=0;off<stillMissing.length;off+=20){
    const rows=stillMissing.slice(off,off+20).map(x=>{
     const id=stdIdByCode.get(x.stdCode);

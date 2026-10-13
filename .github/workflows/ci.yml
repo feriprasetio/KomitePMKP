@@ -43,6 +43,8 @@ jobs:
               raise SystemExit('Playbook source fallback or private evidence viewer is missing')
           if 'function progressFor(list){let done=0,total=0;' not in html:
               raise SystemExit('Progress must be calculated from actual checklist item counts')
+          if 'const found=candidates.find(d=>stdCodeById.get(d.standardId)===x.stdCode);' not in html:
+              raise SystemExit('Seed reconciliation must match the standard, not just title and page')
           if 'data-status-filter="' in html or 'id="taskSearch"' in html:
               raise SystemExit('Redundant duplicate checklist filters/search controls remain')
           if html.count('playbookKey:"PMKP41-') != 8:
@@ -65,13 +67,32 @@ jobs:
               raise SystemExit('A source seed row is missing required Playbook fields')
           print('Validated 138 extracted rows plus 8 PMKP 4.1 supplement rows = 146 checklist activities.')
           PY
-      - name: Validate database hardening migration
+      - name: Validate database release migrations
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          sql = Path('supabase/migrations/20261013064356_pmkp_release_security_hardening.sql').read_text(encoding='utf-8')
-          for token in ['REVOKE ALL ON FUNCTION public.pmkp_guard_auth_user()', 'pmkp_attachment_insert_own', 'PMKP evidence upload authenticated', 'pmkp_standard_admin_write']:
-              if token not in sql:
-                  raise SystemExit(f'Missing security hardening statement: {token}')
-          print('Validated the release security migration source.')
+          expected = {
+              'supabase/migrations/20261013064356_pmkp_release_security_hardening.sql': [
+                  'REVOKE ALL ON FUNCTION public.pmkp_guard_auth_user()', 'pmkp_attachment_insert_own',
+                  'PMKP evidence upload authenticated', 'pmkp_standard_admin_write'
+              ],
+              'supabase/migrations/20261013074509_pmkp_release_policy_optimization.sql': [
+                  'pmkp_standard_read_authenticated', 'pmkp_activity_insert'
+              ],
+              'supabase/migrations/20261013074533_pmkp_release_remove_duplicate_policies.sql': [
+                  'pmkp_standard_admin_insert', 'pmkp_standard_admin_update', 'pmkp_standard_admin_delete'
+              ],
+              'supabase/migrations/20261013074756_pmkp_storage_allow_webp.sql': [
+                  "ARRAY['image/webp']"
+              ],
+          }
+          for file, tokens in expected.items():
+              path = Path(file)
+              if not path.is_file():
+                  raise SystemExit(f'Missing release migration source: {file}')
+              sql = path.read_text(encoding='utf-8')
+              for token in tokens:
+                  if token not in sql:
+                      raise SystemExit(f'Missing migration token {token!r} in {file}')
+          print('Validated release hardening, policy cleanup, and private evidence storage migrations.')
           PY

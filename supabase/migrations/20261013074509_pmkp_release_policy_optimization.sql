@@ -1,0 +1,26 @@
+-- Optimize the PMKP standards write policy and authenticated activity actor check.
+DROP POLICY IF EXISTS pmkp_standard_admin_write ON public."PmkpStandard";
+DROP POLICY IF EXISTS pmkp_standard_insert_admin ON public."PmkpStandard";
+DROP POLICY IF EXISTS pmkp_standard_update_admin ON public."PmkpStandard";
+DROP POLICY IF EXISTS pmkp_standard_delete_admin ON public."PmkpStandard";
+
+CREATE POLICY pmkp_standard_insert_admin
+  ON public."PmkpStandard" FOR INSERT TO authenticated
+  WITH CHECK (((SELECT auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
+
+CREATE POLICY pmkp_standard_update_admin
+  ON public."PmkpStandard" FOR UPDATE TO authenticated
+  USING (((SELECT auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin')
+  WITH CHECK (((SELECT auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
+
+CREATE POLICY pmkp_standard_delete_admin
+  ON public."PmkpStandard" FOR DELETE TO authenticated
+  USING (((SELECT auth.jwt()) -> 'app_metadata' ->> 'role') = 'admin');
+
+DROP POLICY IF EXISTS pmkp_activity_insert ON public."PmkpActivity";
+CREATE POLICY pmkp_activity_insert
+  ON public."PmkpActivity" FOR INSERT TO authenticated
+  WITH CHECK (
+    (SELECT auth.uid()) IS NOT NULL
+    AND actor = ((SELECT auth.jwt()) ->> 'email')
+  );
