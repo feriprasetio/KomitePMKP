@@ -44,7 +44,7 @@ DROP POLICY IF EXISTS pmkp_deny_public_all ON public."PmkpAllowedUser";
 DROP POLICY IF EXISTS pmkp_authenticated_all ON public."PmkpStandard";
 DROP POLICY IF EXISTS pmkp_authenticated_all ON public."PmkpDocument";
 DROP POLICY IF EXISTS pmkp_authenticated_all ON public."PmkpAttachment";
-DROP POLICY IF EXISTS pmkp_activity_read_insert ON public."PmkpActivity";
+DROP POLICY IF EXISTS pmkp_authenticated_read_insert ON public."PmkpActivity";
 DROP POLICY IF EXISTS pmkp_activity_insert ON public."PmkpActivity";
 CREATE POLICY pmkp_authenticated_all ON public."PmkpStandard"
   FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
@@ -52,7 +52,7 @@ CREATE POLICY pmkp_authenticated_all ON public."PmkpDocument"
   FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY pmkp_authenticated_all ON public."PmkpAttachment"
   FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
-CREATE POLICY pmkp_activity_read_insert ON public."PmkpActivity"
+CREATE POLICY pmkp_authenticated_read_insert ON public."PmkpActivity"
   FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
 CREATE POLICY pmkp_activity_insert ON public."PmkpActivity"
   FOR INSERT TO authenticated WITH CHECK (auth.uid() IS NOT NULL);
