@@ -17,7 +17,8 @@ const mimeByExtension: Record<string,string> = {
 function parseArr(s:string|null|undefined):string[]{if(!s)return[];try{const v=JSON.parse(s);return Array.isArray(v)?v.filter((x):x is string=>typeof x==="string"):[]}catch{return[]}}
 function safeName(filename:string){return path.basename(filename).normalize("NFKC").replace(/[^a-zA-Z0-9._-]/g,"_").replace(/^\.+/,"").slice(-100)||"evidence"}
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
- let uploadedObject: string|undefined;\n let objectSavedToDatabase = false;
+ let uploadedObject: string|undefined;
+ let objectSavedToDatabase = false;
  try{
   const user=await requireSession();
   if(!user)return NextResponse.json({status:"error",message:"Autentikasi diperlukan."},{status:401});
