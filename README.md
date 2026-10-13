@@ -4,7 +4,7 @@ Workspace interaktif untuk menjalankan checklist **Playbook STARKES — Peningka
 
 ## Release scope
 
-- **Sumber kerja:** Playbook PMKP yang menjadi basis ekstraksi 138 aktivitas/subtopik pada standar PMKP 1–11. Setiap item menyimpan standar, elemen penilaian, uraian subtopik, saran program, aktivitas implementasi, bukti administratif yang berpotensi muncul, fasilitas pendukung, dan halaman sumber.
+- **Sumber kerja:** Playbook PMKP yang menjadi basis ekstraksi 146 aktivitas/subtopik pada standar PMKP 1–11. Setiap item menyimpan standar, elemen penilaian, uraian subtopik, saran program, aktivitas implementasi, bukti administratif yang berpotensi muncul, fasilitas pendukung, dan halaman sumber.
 - **UI:** dashboard ringkas; progres checklist otomatis; pencarian dan filter; detail aktivitas dalam panel; tab checklist, detail, dan bukti; PIC, prioritas, tenggat dan catatan.
 - **Repository bukti:** unggah kategori PDF/Office/CSV/teks/gambar hingga 20 MB, metadata terhubung ke aktivitas, signed URL sementara untuk pratinjau/unduh.
 - **Audit trail:** log checklist dan unggahan.
