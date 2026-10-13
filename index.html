@@ -13,6 +13,14 @@
 @media(max-width:1100px){.sidebar{width:220px}.mainarea{margin-left:220px}.content{padding:22px}.topbar{padding:0 22px}.statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashgrid{grid-template-columns:1fr}.topsearch{width:230px}}
 @media(max-width:760px){.sidebar{transform:translateX(-100%);transition:transform .2s;width:264px;box-shadow:var(--shadow)}.sidebar.open{transform:translateX(0)}.mainarea{margin-left:0}.hamburger{display:grid}.topbar{padding:0 13px;height:60px;gap:8px}.topsearch{width:min(40vw,210px)}.connection{display:none}.content{padding:18px 13px 30px}.welcome{align-items:flex-start;flex-direction:column}.welcome h1{font-size:23px}.statgrid{gap:9px}.stat{min-height:100px;padding:13px}.statvalue{font-size:23px}.standards{grid-template-columns:1fr}.pagehead{align-items:flex-start;flex-direction:column}.pagehead .toolbar{width:100%}.repo-summary{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.reposum{padding:10px}.reposum strong{font-size:17px}.reposum span{font-size:10px}.topright{gap:6px}.topright .btn{padding:8px}.crumb{display:none}.authpage{grid-template-columns:1fr}.authhero{min-height:auto;padding:32px 24px 24px}.authhero h1{font-size:36px}.authhero p{font-size:13px}.authfeatures{margin-top:18px}.authbox{border:0;padding:16px 20px 30px}.authcard{padding:22px}.twocol{grid-template-columns:1fr}.drawer{width:100vw}.modalhead{padding:17px}.modalbody{padding:14px 13px 24px}.toolbar .field{min-width:calc(50% - 5px);flex:1}.toolbar .field:first-child{min-width:100%}.toastwrap{right:12px;bottom:12px}}
 @media(max-width:390px){.statgrid{grid-template-columns:1fr 1fr}.statlabel{font-size:10px}.statvalue{font-size:22px}.authfeatures{grid-template-columns:1fr}.topsearch{width:37vw}.topbar .btn span{display:none}}
+
+.viewerback{position:fixed;z-index:120;inset:0;background:rgba(14,31,42,.56);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(4px)}
+.viewerpanel{width:min(1120px,100%);height:min(90vh,960px);background:#fff;border:1px solid #dce6eb;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 26px 80px rgba(16,38,52,.28)}
+.viewerhead{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 18px;border-bottom:1px solid var(--line);background:#fff}
+.viewerinfo{display:flex;flex-direction:column;gap:5px;min-width:0}.viewertitle{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.viewerinfo small,.viewerfoot small{font-size:11px;color:var(--muted);line-height:1.5}
+.viewerbody{flex:1;min-height:0;background:#eaf0f3}.viewerbody iframe{display:block;width:100%;height:100%;min-height:0;border:0;background:#fff}.viewerunsupported{display:grid;place-items:center;padding:24px}.viewerhint{max-width:420px;text-align:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px;line-height:1.6}.viewerhint p{font-size:12px;color:var(--muted);margin:8px 0 0}
+.viewerfoot{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 18px;border-top:1px solid var(--line);background:#fff}
+@media(max-width:640px){.viewerback{padding:0}.viewerpanel{height:100dvh;width:100%;border-radius:0}.viewerhead{padding:12px}.viewerfoot{align-items:flex-start;flex-direction:column;padding:12px}.viewerfoot .btn{width:100%}.viewerfoot small{max-width:100%}}
 </style>
 </head>
 <body>
@@ -96,7 +104,7 @@ const pmkp41Supplement=[
 {playbookKey:"PMKP41-c-145",stdCode:"PMKP 4.1",elementCode:"C",title:"Penyampaian Hasil Analisis kepada Pemilik Mutu",sourcePage:362,criterion:"Hasil analisis data dilaporkan kepada penanggung jawab indikator mutu yang akan melakukan perbaikan.",regulation:"Perdir Tata Kelola PMKP",programSuggestion:"Diseminasi hasil analisis",implementation:"Komite Mutu menyampaikan hasil analisis kepada pemilik mutu, kemudian bersama-sama membahas penyebab capaian indikator, peluang perbaikan dan rencana tindak lanjut yang dilakukan pemilik mutu.",adminDocs:"Berita acara pembahasan; RTL unit",facility:"Dashboard indikator"},
 {playbookKey:"PMKP41-c-146",stdCode:"PMKP 4.1",elementCode:"C",title:"Monitoring Pelaksanaan Rencana Tindak Lanjut",sourcePage:362,criterion:"Hasil analisis data dilaporkan kepada penanggung jawab indikator mutu yang akan melakukan perbaikan.",regulation:"Perdir Tata Kelola PMKP",programSuggestion:"Monitoring pelaksanaan tindak lanjut",implementation:"Pemilik mutu melaksanakan dan memantau rencana tindak lanjut hasil analisis indikator; Komite Mutu memonitor kemajuan, mengevaluasi efektivitas perbaikan dan memfasilitasi penyelesaian hambatan.",adminDocs:"Laporan monitoring; progres RTL; hasil evaluasi",facility:"Dashboard monitoring"}
 ];
-let user=null,standards=[],docs=[],attachments=[],activities=[],invites=[],activePage="dashboard",selectedDoc=null,searchText="",taskFilter={std:"all",status:"all"},taskPage=1,taskPageSize=25,repoFilter="all",modalTab="checklist",loading=false,seedCache=null;
+let user=null,standards=[],docs=[],attachments=[],activities=[],invites=[],activePage="dashboard",selectedDoc=null,searchText="",taskFilter={std:"all",status:"all"},taskPage=1,taskPageSize=25,repoFilter="all",modalTab="checklist",loading=false,seedCache=null,evidenceViewerEscapeHandler=null;
 const $=id=>document.getElementById(id);
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const initials=s=>(String(s||"PM").trim().split(/\s+/).slice(0,2).map(x=>x[0]||"").join("").toUpperCase()||"PM");
@@ -105,24 +113,25 @@ const nowISO=()=>new Date().toISOString();
 function toast(message,type){const d=document.createElement("div");d.className="toast "+(type||"");d.textContent=message;$("toastwrap").appendChild(d);setTimeout(()=>d.remove(),4400)}
 function dateFmt(v){if(!v)return "—";const d=new Date(v);return isNaN(d)?String(v):d.toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"})}
 function dateTime(v){if(!v)return "—";const d=new Date(v);return isNaN(d)?String(v):d.toLocaleString("id-ID",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}
-function splitDocs(v,fallback){const raw=String(v||"").trim();if(raw.startsWith("[")){try{const parsed=JSON.parse(raw);if(Array.isArray(parsed)){const items=parsed.map(x=>String(x||"").trim()).filter(Boolean);if(items.length)return items}}catch(e){}}const list=raw.split(/[;\\n]+/).map(s=>s.trim()).filter(Boolean);return list.length?list:[fallback]}
+function splitDocs(v,fallback){const raw=String(v||"").trim(),fb=fallback?[String(fallback).trim()]:[];if(!raw)return fb;if(raw.startsWith("[")){try{const parsed=JSON.parse(raw);if(Array.isArray(parsed)){const items=parsed.map(x=>String(x||"").trim()).filter(Boolean);return items.length?items:fb}}catch(e){}}const list=raw.split(/[;\n]+/).map(s=>s.trim()).filter(Boolean);return list.length?list:fb}
+function preferredDocs(primary,secondary,fallback){const first=splitDocs(primary,null);if(first.length)return first;const second=splitDocs(secondary,null);return second.length?second:(fallback?[fallback]:[])}
 function allChecklistItems(d){
  const groups=[
- {id:"reg",title:"Regulasi dan tata kelola",items:splitDocs(d.regulasiDocs,"Telaah regulasi yang relevan dan pastikan kewenangan penetapannya.")},
- {id:"prog",title:"Rencana/program kerja",items:[d.programSuggestion||("Rencanakan "+d.title)]},
- {id:"impl",title:"Aktivitas implementasi",items:[d.implementation||("Laksanakan "+d.title+" sesuai elemen penilaian.") ]},
- {id:"evid",title:"Bukti administratif yang berpotensi muncul",items:splitDocs(d.adminDocs,"Dokumentasikan hasil kegiatan, berita acara/laporan dan tindak lanjut.")},
- {id:"facility",title:"Fasilitas pendukung",items:[d.pendukungDocs||"Repository dokumen dan sarana kerja yang relevan."]},
+ {id:"reg",title:"Regulasi dan tata kelola",items:preferredDocs(d.regulasiDocs,d.regulationRecommendation,"Telaah regulasi yang relevan dan pastikan kewenangan penetapannya.")},
+ {id:"prog",title:"Rencana/program kerja",items:[d.programSuggestion||d.programWork||("Rencanakan "+d.title)]},
+ {id:"impl",title:"Aktivitas implementasi",items:[d.implementation||d.implementationActivity||("Laksanakan "+d.title+" sesuai elemen penilaian.") ]},
+ {id:"evid",title:"Bukti administratif yang berpotensi muncul",items:preferredDocs(d.adminDocs,d.administrativeDocuments,"Dokumentasikan hasil kegiatan, berita acara/laporan dan tindak lanjut.")},
+ {id:"facility",title:"Fasilitas pendukung",items:preferredDocs(d.pendukungDocs,d.supportingFacilities,"Repository dokumen dan sarana kerja yang relevan.")},
  {id:"verify",title:"Verifikasi dan tindak lanjut",items:["Penanggung jawab menelaah kecukupan dan keterlacakan bukti.","Monitoring/evaluasi, hasil pembelajaran dan rencana tindak lanjut dicatat bila relevan."]}
  ];
- return groups.map(g=>({id:g.id,title:g.title,items:g.items.map((label,i)=>({id:g.id+"-"+i,label:label}))}));
+ return groups.map(g=>{const counts={};return {id:g.id,title:g.title,items:g.items.map(label=>{const base=normalizeTitle(label).replace(/\s+/g,"-").slice(0,64)||"butir";const n=counts[base]||0;counts[base]=n+1;return {id:g.id+"-"+base+(n?"-"+(n+1):""),label:String(label)}})}});
 }
 function checklistStats(d){const items=allChecklistItems(d).flatMap(g=>g.items);const checks=(d.checklistData&&d.checklistData.checks)||{};const done=items.filter(it=>checks[it.id]===true).length;return {total:items.length,done:done,percent:items.length?Math.round(done/items.length*100):0}}
-function statusInfo(d){const p=checklistStats(d).percent;if(p===100)return {key:"done",label:"Selesai"};if(p>0)return {key:"progress",label:"Dalam proses"};if(d.status==="review")return {key:"review",label:"Perlu review"};return {key:"todo",label:"Belum dimulai"}}
+function statusInfo(d){const p=checklistStats(d).percent;if(p===100)return {key:"done",label:"Selesai"};if(d.status==="review")return {key:"review",label:"Perlu review"};if(p>0)return {key:"progress",label:"Dalam proses"};return {key:"todo",label:"Belum dimulai"}}
 function stdNumber(v){return Number(String(v||"").replace(/\D/g,""))||0}
 function belongsToStandard(d,code){const s=standards.find(x=>x.code===code);return s?d.standardId===s.id:d.stdCode===code}
 function stdTasks(code){return docs.filter(d=>belongsToStandard(d,code))}
-function progressFor(list){if(!list.length)return 0;return Math.round(list.reduce((s,d)=>s+checklistStats(d).percent,0)/list.length)}
+function progressFor(list){let done=0,total=0;for(const d of list){const s=checklistStats(d);done+=s.done;total+=s.total}return total?Math.round(done/total*100):0}
 function sourcePageLabel(d){const p=Number(d.sourcePage)||0;return p>0?"PDF "+p+" · cetak "+(p+349):"—"}
 function sourceLabel(d){const s=standards.find(x=>x.id===d.standardId);return "Playbook STARKES PMKP · "+sourcePageLabel(d)+" · "+(s?s.code:d.stdCode)+" · EP "+(d.elementCode||"—")}
 function pageName(){return ({dashboard:"Ringkasan",checklist:"Checklist Playbook",repository:"Repository Bukti",activity:"Riwayat Aktivitas",users:"Pengguna",settings:"Pengaturan"})[activePage]||"Ringkasan"}
@@ -265,7 +274,7 @@ function renderTasks(){
  let list=docs.filter(d=>{const s=taskFilter.std==="all"||belongsToStandard(d,taskFilter.std);const status=taskFilter.status==="all"||statusInfo(d).key===taskFilter.status;const q=searchText.toLowerCase();const searchable=[d.title,d.subTopic,d.stdCode,d.elementCode,d.criterion,d.implementation,d.adminDocs].join(" ").toLowerCase();return s&&status&&(!q||searchable.includes(q))});
  const countDone=list.filter(d=>checklistStats(d).percent===100).length;
  const pageCount=Math.max(1,Math.ceil(list.length/taskPageSize));taskPage=Math.min(taskPage,pageCount);const visible=list.slice((taskPage-1)*taskPageSize,taskPage*taskPageSize);
- return '<section class="pagehead"><div><div class="eyebrow">Checklist pemenuhan</div><h1>Checklist Playbook STARKES</h1><p>146 aktivitas Playbook pada kelompok PMKP 1–11 termasuk PMKP 4.1. Pilih aktivitas untuk membuka detail, checklist dan bukti.</p></div><div class="toolbar"><span class="tag">'+list.length+' hasil</span><span class="tag done">'+countDone+' selesai</span></div></section><section class="card cardpad"><div class="toolbar"><div class="field" style="flex:1;min-width:220px"><label for="taskSearch">Cari aktivitas</label><input id="taskSearch" value="'+esc(searchText)+'" placeholder="Judul, EP, bukti, aktivitas…"></div><div class="field"><label for="stdFilter">Standar</label><select id="stdFilter"><option value="all">Semua standar</option>'+standards.map(s=>'<option '+(taskFilter.std===s.code?"selected":"")+' value="'+esc(s.code)+'">'+esc(s.code)+' · '+esc(s.title)+'</option>').join("")+'</select></div><div class="field"><label for="statusFilter">Status checklist</label><select id="statusFilter">'+[['all','Semua status'],['todo','Belum dimulai'],['progress','Dalam proses'],['done','Selesai']].map(x=>'<option value="'+x[0]+'" '+(taskFilter.status===x[0]?"selected":"")+'>'+x[1]+'</option>').join("")+'</select></div></div><div class="filters">'+[['all','Semua'],['todo','Belum dimulai'],['progress','Dalam proses'],['done','Selesai']].map(x=>'<button class="filterchip '+(taskFilter.status===x[0]?"active":"")+'" data-status-filter="'+x[0]+'">'+x[1]+'</button>').join("")+'</div><div class="tablewrap"><table class="datatable"><thead><tr><th style="width:48%">Aktivitas / Elemen penilaian</th><th>Standar & rujukan</th><th>Progres</th><th>Status</th><th></th></tr></thead><tbody>'+(list.length?visible.map(d=>{const st=statusInfo(d),p=checklistStats(d).percent;return '<tr><td><div class="taskname">'+esc(d.title)+'</div><div class="taskmeta">EP '+esc(d.elementCode||"—")+' · '+esc(d.programSuggestion||"Aktivitas Playbook")+'</div></td><td>'+esc(d.stdCode)+'<div class="taskmeta">PDF '+esc(d.sourcePage||"—")+' / cetak '+esc((Number(d.sourcePage)||0)+349)+'</div></td><td><div class="tableprogress"><div class="progress"><span style="width:'+p+'%"></span></div><strong>'+p+'%</strong></div></td><td><span class="tag '+st.key+'">'+st.label+'</span></td><td><button class="btn small" data-open-task="'+esc(d.id)+'">Buka →</button></td></tr>'}).join(""):'<tr><td colspan="5"><div class="empty"><strong>Tidak ada item yang cocok</strong>Ubah pencarian atau filter untuk melihat aktivitas lainnya.</div></td></tr>')+'</tbody></table></div><div class="between" style="margin-top:13px;flex-wrap:wrap"><span class="tiny">Menampilkan '+(list.length?((taskPage-1)*taskPageSize+1):0)+'–'+Math.min(taskPage*taskPageSize,list.length)+' dari '+list.length+' item · Checklist tersimpan otomatis ke Supabase.</span><div class="toolbar"><button class="btn small" data-task-page="prev" '+(taskPage<=1?'disabled':'')+'>← Sebelumnya</button><span class="tag">Halaman '+taskPage+' / '+pageCount+'</span><button class="btn small" data-task-page="next" '+(taskPage>=pageCount?'disabled':'')+'>Berikutnya →</button></div></div></section>';
+ return '<section class="pagehead"><div><div class="eyebrow">Checklist pemenuhan</div><h1>Checklist Playbook STARKES</h1><p>146 aktivitas Playbook pada kelompok PMKP 1–11 termasuk PMKP 4.1. Pilih aktivitas untuk membuka detail, checklist dan bukti.</p></div><div class="toolbar"><span class="tag">'+list.length+' hasil</span><span class="tag done">'+countDone+' selesai</span></div></section><section class="card cardpad"><div class="toolbar"><div class="field"><label for="stdFilter">Standar</label><select id="stdFilter"><option value="all">Semua standar</option>'+standards.map(s=>'<option '+(taskFilter.std===s.code?"selected":"")+' value="'+esc(s.code)+'">'+esc(s.code)+' · '+esc(s.title)+'</option>').join("")+'</select></div><div class="field"><label for="statusFilter">Status checklist</label><select id="statusFilter">'+[['all','Semua status'],['todo','Belum dimulai'],['progress','Dalam proses'],['review','Perlu review'],['done','Selesai']].map(x=>'<option value="'+x[0]+'" '+(taskFilter.status===x[0]?"selected":"")+'>'+x[1]+'</option>').join("")+'</select></div></div><div class="tablewrap"><table class="datatable"><thead><tr><th style="width:48%">Aktivitas / Elemen penilaian</th><th>Standar & rujukan</th><th>Progres</th><th>Status</th><th></th></tr></thead><tbody>'+(list.length?visible.map(d=>{const st=statusInfo(d),p=checklistStats(d).percent;return '<tr><td><div class="taskname">'+esc(d.title)+'</div><div class="taskmeta">EP '+esc(d.elementCode||"—")+' · '+esc(d.programSuggestion||"Aktivitas Playbook")+'</div></td><td>'+esc(d.stdCode)+'<div class="taskmeta">PDF '+esc(d.sourcePage||"—")+' / cetak '+esc((Number(d.sourcePage)||0)+349)+'</div></td><td><div class="tableprogress"><div class="progress"><span style="width:'+p+'%"></span></div><strong>'+p+'%</strong></div></td><td><span class="tag '+st.key+'">'+st.label+'</span></td><td><button class="btn small" data-open-task="'+esc(d.id)+'">Buka →</button></td></tr>'}).join(""):'<tr><td colspan="5"><div class="empty"><strong>Tidak ada item yang cocok</strong>Ubah pencarian atau filter untuk melihat aktivitas lainnya.</div></td></tr>')+'</tbody></table></div><div class="between" style="margin-top:13px;flex-wrap:wrap"><span class="tiny">Menampilkan '+(list.length?((taskPage-1)*taskPageSize+1):0)+'–'+Math.min(taskPage*taskPageSize,list.length)+' dari '+list.length+' item · Checklist tersimpan otomatis ke Supabase.</span><div class="toolbar"><button class="btn small" data-task-page="prev" '+(taskPage<=1?'disabled':'')+'>← Sebelumnya</button><span class="tag">Halaman '+taskPage+' / '+pageCount+'</span><button class="btn small" data-task-page="next" '+(taskPage>=pageCount?'disabled':'')+'>Berikutnya →</button></div></div></section>';
 }
 function renderRepository(){
  const files=attachments.filter(a=>repoFilter==="all"||a.category===repoFilter).filter(a=>{if(!searchText)return true;const d=docs.find(x=>x.id===a.documentId);return [a.filename,a.category,a.description,a.uploadedBy,d&&d.title,d&&d.stdCode].join(" ").toLowerCase().includes(searchText.toLowerCase())});
@@ -340,7 +349,7 @@ async function toggleCheck(key,checked){
 async function saveTaskMeta(e){
  e.preventDefault();const f=e.currentTarget,d=selectedDoc;const fd=new FormData(f);
  const payload={pic:String(fd.get("pic")||"").trim()||null,priority:String(fd.get("priority")||"Sedang"),dueDate:String(fd.get("dueDate")||"")||null,notes:String(fd.get("notes")||"").trim()||null,updatedAt:nowISO()};
- const old=d.status;const checkProgress=checklistStats(d).percent;payload.status=checkProgress===100?"done":(checkProgress>0?"in_progress":(String(fd.get("status")||"todo")==="review"?"review":"todo"));
+ const old=d.status;const checkProgress=checklistStats(d).percent;const requestedStatus=String(fd.get("status")||"todo");payload.status=checkProgress===100?"done":(requestedStatus==="review"?"review":(checkProgress>0?"in_progress":"todo"));
  const r=await db.from("PmkpDocument").update(payload).eq("id",d.id);if(r.error)return toast(r.error.message,"error");
  await audit(d.id,"Metadata aktivitas disimpan",d.title+" · PIC: "+(payload.pic||"belum ditetapkan"),old,payload.status);
  await fetchWorkspace();selectedDoc=docs.find(x=>x.id===d.id);renderShell();toast("Detail aktivitas disimpan.","success");
@@ -362,10 +371,48 @@ async function uploadEvidence(docId,file,category,description){
   await fetchWorkspace();selectedDoc=docs.find(x=>x.id===docId)||null;renderShell();toast("Bukti tersimpan di repository privat.","success");
  }catch(err){toast(err.message||"Unggah gagal. Periksa koneksi dan akses storage.","error")}
 }
+function closeEvidenceViewer(){
+ const viewer=$("evidenceViewer");
+ if(viewer){const frame=viewer.querySelector("iframe");if(frame)frame.src="about:blank";viewer.remove()}
+ if(evidenceViewerEscapeHandler){document.removeEventListener("keydown",evidenceViewerEscapeHandler);evidenceViewerEscapeHandler=null}
+}
+function openEvidenceViewer(a,url){
+ closeEvidenceViewer();
+ const back=document.createElement("div");back.className="viewerback";back.id="evidenceViewer";
+ const panel=document.createElement("section");panel.className="viewerpanel";panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.setAttribute("aria-label","Pratinjau bukti PMKP");
+ const head=document.createElement("header");head.className="viewerhead";
+ const info=document.createElement("div");info.className="viewerinfo";
+ const title=document.createElement("strong");title.className="viewertitle";title.textContent=a.filename||"Dokumen bukti";
+ const meta=document.createElement("small");const item=docs.find(d=>d.id===a.documentId);meta.textContent=(a.category||"Bukti PMKP")+" · "+(item?(item.stdCode+" · "+item.title):"Repository PMKP")+" · URL privat berlaku 10 menit";
+ info.append(title,meta);
+ const close=document.createElement("button");close.className="iconbtn";close.type="button";close.setAttribute("aria-label","Tutup pratinjau");close.textContent="✕";close.addEventListener("click",closeEvidenceViewer);
+ head.append(info,close);
+ const body=document.createElement("div");body.className="viewerbody";
+ const ext=String(a.filename||"").split(".").pop().toLowerCase(),mime=String(a.mimeType||"").toLowerCase();
+ const previewable=mime==="application/pdf"||mime.startsWith("image/")||mime==="text/plain"||mime==="text/csv"||["pdf","png","jpg","jpeg","webp","gif","txt","csv"].includes(ext);
+ if(previewable){
+  const frame=document.createElement("iframe");frame.title="Pratinjau "+(a.filename||"bukti PMKP");frame.referrerPolicy="no-referrer";frame.src=url;body.appendChild(frame)
+ }else{
+  body.classList.add("viewerunsupported");
+  const msg=document.createElement("div");msg.className="viewerhint";
+  const strong=document.createElement("strong");strong.textContent="Pratinjau inline tidak tersedia untuk format ini.";
+  const p=document.createElement("p");p.textContent="Gunakan tombol “Buka di tab baru / unduh” untuk membuka dokumen Office pada aplikasi yang sesuai.";
+  msg.append(strong,p);body.appendChild(msg)
+ }
+ const foot=document.createElement("footer");foot.className="viewerfoot";
+ const note=document.createElement("small");note.textContent="Dokumen privat · Tautan sementara · Hindari membagikan URL pratinjau.";
+ const open=document.createElement("a");open.className="btn primary";open.href=url;open.target="_blank";open.rel="noopener noreferrer";open.textContent="Buka di tab baru / unduh";
+ foot.append(note,open);panel.append(head,body,foot);back.appendChild(panel);
+ back.addEventListener("click",event=>{if(event.target===back)closeEvidenceViewer()});
+ document.body.appendChild(back);
+ evidenceViewerEscapeHandler=event=>{if(event.key==="Escape")closeEvidenceViewer()};
+ document.addEventListener("keydown",evidenceViewerEscapeHandler);
+ close.focus();
+}
 async function viewAttachment(id){
  const a=attachments.find(x=>x.id===id);if(!a)return toast("Metadata berkas tidak ditemukan.","error");
- const win=window.open("about:blank","_blank");if(win)win.opener=null;
- try{const r=await db.storage.from(BUCKET).createSignedUrl(a.filePath,600);if(r.error)throw r.error;if(win)win.location.href=r.data.signedUrl;else window.location.href=r.data.signedUrl;}catch(err){if(win)win.close();toast(err.message||"Pratinjau gagal dibuka.","error")}
+ try{const r=await db.storage.from(BUCKET).createSignedUrl(a.filePath,600);if(r.error)throw r.error;openEvidenceViewer(a,r.data.signedUrl)}
+ catch(err){toast(err.message||"Pratinjau gagal dibuka.","error")}
 }
 async function addInvite(e){
  e.preventDefault();if(!isAdmin())return;const form=e.currentTarget,fd=new FormData(form);const email=String(fd.get("email")||"").trim().toLowerCase();

@@ -6,7 +6,7 @@ Workspace interaktif untuk menjalankan checklist **Playbook STARKES — Peningka
 
 - **Sumber kerja:** Playbook PMKP yang menjadi basis ekstraksi 146 aktivitas/subtopik pada standar PMKP 1–11. Setiap item menyimpan standar, elemen penilaian, uraian subtopik, saran program, aktivitas implementasi, bukti administratif yang berpotensi muncul, fasilitas pendukung, dan halaman sumber.
 - **UI:** dashboard ringkas; progres checklist otomatis; pencarian dan filter; detail aktivitas dalam panel; tab checklist, detail, dan bukti; PIC, prioritas, tenggat dan catatan.
-- **Repository bukti:** unggah kategori PDF/Office/CSV/teks/gambar hingga 20 MB, metadata terhubung ke aktivitas, signed URL sementara untuk pratinjau/unduh.
+- **Repository bukti:** unggah kategori PDF/Office/CSV/teks/gambar hingga 20 MB, metadata terhubung ke aktivitas, modal pratinjau di dalam aplikasi untuk format yang didukung, serta tautan privat sementara untuk membuka/unduh.
 - **Audit trail:** log checklist dan unggahan.
 - **Akses:** Supabase Auth, signup berbasis undangan, role admin/member yang ditetapkan server/database, dan aktivasi administrator pertama satu-kali.
 - **Data:** checklist persisten tersimpan di database Supabase PMKP, bukan localStorage.
@@ -36,9 +36,9 @@ Kode aktivasi tidak disimpan di repositori atau HTML publik. Jangan membagikanny
 
 ## Kebijakan checklist
 
-Checklist adalah alat kerja internal untuk memastikan jejak regulasi, rencana, implementasi, bukti, dan verifikasi/tindak lanjut dapat ditelusuri. Persentase yang terlihat merupakan persentase butir checklist yang dicentang; bukan skor akreditasi resmi dan bukan klaim pemenuhan elemen penilaian. Periksa selalu halaman Playbook sumber, regulasi yang berlaku, dan bukti yang sah sebelum menandai suatu butir selesai.
+Checklist adalah alat kerja internal untuk memastikan jejak regulasi, rencana, implementasi, bukti, dan verifikasi/tindak lanjut dapat ditelusuri. Persentase keseluruhan dihitung secara berbobot dari jumlah butir checklist yang selesai dibandingkan seluruh butir checklist—bukan rata-rata per aktivitas. Persentase tersebut bukan skor akreditasi resmi dan bukan klaim pemenuhan elemen penilaian. Periksa selalu halaman Playbook sumber, regulasi yang berlaku, dan bukti yang sah sebelum menandai suatu butir selesai.
 
-Butir checklist dibentuk dari konten Playbook setiap subtopik: regulasi rekomendasi, usulan program kerja, aktivitas implementasi, bukti administratif dan fasilitas pendukung, lalu tambahan langkah verifikasi/tindak lanjut. Tambahan langkah ini adalah bantuan alur kerja, bukan kutipan persis dari Playbook.
+Butir checklist dibentuk dari konten Playbook setiap subtopik: regulasi yang direkomendasikan, usulan program kerja, aktivitas implementasi, dokumen administratif yang berpotensi muncul, fasilitas pendukung, lalu tambahan langkah verifikasi/tindak lanjut. Bila kolom dokumen kosong/array kosong, workspace memakai kolom rekomendasi terkait pada sumber Playbook agar tidak menampilkan tanda “[]” sebagai butir checklist. Tambahan langkah verifikasi/tindak lanjut adalah bantuan alur kerja, bukan kutipan persis dari Playbook.
 
 ## Keamanan berkas dan data
 

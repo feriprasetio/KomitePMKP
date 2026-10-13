@@ -39,6 +39,12 @@ jobs:
               raise SystemExit(f'Expected one inline application script, found {len(inline)}')
           if 'pmkp-bootstrap-admin' not in html or 'pmkp-evidence' not in html:
               raise SystemExit('Required Supabase authentication or evidence-storage integration is missing')
+          if 'function preferredDocs' not in html or 'function openEvidenceViewer' not in html or '.viewerpanel' not in html:
+              raise SystemExit('Playbook source fallback or private evidence viewer is missing')
+          if 'function progressFor(list){let done=0,total=0;' not in html:
+              raise SystemExit('Progress must be calculated from actual checklist item counts')
+          if 'data-status-filter="' in html or 'id="taskSearch"' in html:
+              raise SystemExit('Redundant duplicate checklist filters/search controls remain')
           if html.count('playbookKey:"PMKP41-') != 8:
               raise SystemExit('The eight PMKP 4.1 checklist records are incomplete')
           Path('/tmp/pmkp-inline.js').write_text(inline[0], encoding='utf-8')
@@ -58,4 +64,14 @@ jobs:
           if any(not required.issubset(row) for row in data):
               raise SystemExit('A source seed row is missing required Playbook fields')
           print('Validated 138 extracted rows plus 8 PMKP 4.1 supplement rows = 146 checklist activities.')
+          PY
+      - name: Validate database hardening migration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          sql = Path('supabase/migrations/20261013064356_pmkp_release_security_hardening.sql').read_text(encoding='utf-8')
+          for token in ['REVOKE ALL ON FUNCTION public.pmkp_guard_auth_user()', 'pmkp_attachment_insert_own', 'PMKP evidence upload authenticated', 'pmkp_standard_admin_write']:
+              if token not in sql:
+                  raise SystemExit(f'Missing security hardening statement: {token}')
+          print('Validated the release security migration source.')
           PY
