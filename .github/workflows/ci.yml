@@ -1,39 +1,61 @@
-name: PMKP release validation
+name: PMKP static release validation
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
-  group: pmkp-ci-main
+  group: pmkp-static-ci
   cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres?sslmode=disable
-      AUTH_SECRET: ci-only-not-a-production-secret-at-least-32-chars
-      SUPABASE_URL: https://example.supabase.co
-      SUPABASE_SERVICE_ROLE_KEY: ci-only-placeholder
-      ADMIN_USERNAME: superadmin
-      ADMIN_NAME: Komite PMKP
-      ADMIN_INITIAL_PASSWORD: ci-only-temporary-password
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Generate Prisma client
-        run: npx prisma generate
-      - name: Type-check
-        run: npm run check
-      - name: Lint
-        run: npm run lint
-      - name: Production build
-        run: npm run build
+      - name: Validate app and seed presence
+        run: |
+          test -s index.html
+          test -s playbook-seed.gz.b64
+      - name: Syntax-check deployed application JavaScript
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path('index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script([^>]*)>(.*?)</script>', html, flags=re.I | re.S)
+          inline = [body for attrs, body in scripts if 'src=' not in attrs.lower() and body.strip()]
+          if len(inline) != 1:
+              raise SystemExit(f'Expected one inline application script, found {len(inline)}')
+          if 'pmkp-bootstrap-admin' not in html or 'pmkp-evidence' not in html:
+              raise SystemExit('Required Supabase authentication or evidence-storage integration is missing')
+          if html.count('playbookKey:"PMKP41-') != 8:
+              raise SystemExit('The eight PMKP 4.1 checklist records are incomplete')
+          Path('/tmp/pmkp-inline.js').write_text(inline[0], encoding='utf-8')
+          PY
+          node --check /tmp/pmkp-inline.js
+      - name: Validate source seed integrity
+        run: |
+          python3 - <<'PY'
+          import base64, gzip, json
+          from pathlib import Path
+          packed = base64.b64decode(Path('playbook-seed.gz.b64').read_text().strip(), validate=True)
+          data = json.loads(gzip.decompress(packed))
+          keys = [row.get('playbookKey') for row in data]
+          if len(data) != 138 or any(not k for k in keys) or len(set(keys)) != len(keys):
+              raise SystemExit(f'Invalid source seed count or keys: {len(data)} rows')
+          required = {'stdCode','elementCode','title','sourcePage','implementation','adminDocs'}
+          if any(not required.issubset(row) for row in data):
+              raise SystemExit('A source seed row is missing required Playbook fields')
+          print('Validated 138 extracted rows plus 8 PMKP 4.1 supplement rows = 146 checklist activities.')
+          PY
