@@ -1,176 +1,32 @@
-// Shared types for the PMKP Dashboard.
-//
-// These mirror the shapes returned by the API routes
-// (/api/standards, /api/documents, /api/documents/[id], /api/stats,
-// /api/activities) so the same types can be used for both the server-
-// rendered initial data and the client-side re-fetches.
-
 export type StatusKey = "todo" | "prog" | "review" | "done" | "block";
 export type Priority = "Tinggi" | "Sedang" | "Rendah";
-
-export interface StandardInfo {
-  id: string;
-  code: string; // "PMKP 1"
-  title: string;
-  description?: string | null;
-  color: string; // hex string
-  sortOrder: number;
-}
-
-export interface StandardStats {
-  total: number;
-  done: number;
-  prog: number;
-  todo: number;
-  block: number;
-  pct: number;
-  overdue: number;
-}
-
-export interface StandardWithStats extends StandardInfo {
-  stats: StandardStats;
-}
-
-export interface DocActivity {
-  id: string;
-  actor: string;
-  action: string;
-  fromValue?: string | null;
-  toValue?: string | null;
-  message: string;
-  createdAt: string; // ISO
-}
-
+export interface StandardInfo { id:string; code:string; title:string; description?:string|null; color:string; sortOrder:number; }
+export interface StandardStats { total:number; done:number; prog:number; todo:number; block:number; pct:number; overdue:number; }
+export interface StandardWithStats extends StandardInfo { stats:StandardStats; }
+export interface DocActivity { id:string; actor:string; action:string; fromValue?:string|null; toValue?:string|null; message:string; createdAt:string; }
 export interface PmkpDocument {
-  id: string;
-  stdCode: string; // "PMKP 1a"
-  standardId: string;
-  standard: StandardInfo | null;
-  subTopic: string;
-  title: string;
-  description?: string | null;
-  pic?: string | null;
-  status: StatusKey;
-  progress: number; // 0..100
-  priority: Priority;
-  dueDate?: string | null; // ISO
-  pendukung: string[];
-  admin: string[];
-  regulasi: string[];
-  notes?: string | null;
-  createdAt: string;
-  updatedAt: string;
+ id:string; stdCode:string; standardId:string; standard:StandardInfo|null;
+ subTopic:string; title:string; description?:string|null;
+ elementCode?:string|null; elementAssessment?:string|null; regulationRecommendation?:string|null;
+ programWork?:string|null; implementationActivity?:string|null; administrativeDocuments?:string|null;
+ supportingFacilities?:string|null; sourcePage?:number|null; checkedItems:string[];
+ pic?:string|null; status:StatusKey; progress:number; priority:Priority; dueDate?:string|null;
+ pendukung:string[]; admin:string[]; regulasi:string[]; notes?:string|null; createdAt:string; updatedAt:string;
 }
-
-export interface PmkpDocumentDetail extends PmkpDocument {
-  activities: DocActivity[];
+export interface PmkpAttachment {
+ id:string; documentId:string; filename:string; filePath:string; fileSize:number; mimeType?:string|null;
+ evidenceLabel?:string|null; uploadedBy:string; createdAt:string;
+ document?:{id:string;title:string;stdCode:string;standard?:{code:string;title:string}|null}|null;
 }
-
-export interface StatsByStatus {
-  done: number;
-  review: number;
-  prog: number;
-  todo: number;
-  block: number;
-}
-
-export interface StatsActivity {
-  id: string;
-  actor: string;
-  action: string;
-  message: string;
-  createdAt: string;
-  docTitle?: string | null;
-  stdCode?: string | null;
-}
-
-export interface UpcomingDoc {
-  id: string;
-  title: string;
-  stdCode: string;
-  pic?: string | null;
-  status: StatusKey;
-  progress: number;
-  dueDate?: string | null;
-  color?: string | null;
-}
-
-export interface DashboardStats {
-  total: number;
-  byStatus: StatsByStatus;
-  avgProgress: number;
-  overdue: number;
-  activities: StatsActivity[];
-  upcoming: UpcomingDoc[];
-}
-
-export interface FilterState {
-  standard: string; // "all" or sortOrder as string ("1".."11")
-  status: "all" | StatusKey;
-  priority: "all" | Priority;
-  pic: string; // "all" or PIC string
-  q: string;
-  sort: "due" | "progress" | "std"; // Tenggat terdekat | Progress tertinggi | Standar A→Z
-}
-
-export const STATUS_META: Record<
-  StatusKey,
-  { label: string; color: string; bg: string; text: string; dot: string }
-> = {
-  done: {
-    label: "Selesai",
-    color: "#10b981",
-    bg: "#dcfce7",
-    text: "#166534",
-    dot: "#16a34a",
-  },
-  review: {
-    label: "Review",
-    color: "#f59e0b",
-    bg: "#fef3c7",
-    text: "#92400e",
-    dot: "#f59e0b",
-  },
-  prog: {
-    label: "Proses",
-    color: "#38bdf8",
-    bg: "#dbeafe",
-    text: "#1e40af",
-    dot: "#3b82f6",
-  },
-  todo: {
-    label: "Belum",
-    color: "#94a3b8",
-    bg: "#f1f5f9",
-    text: "#475569",
-    dot: "#94a3b8",
-  },
-  block: {
-    label: "Blokir",
-    color: "#fb7185",
-    bg: "#fee2e2",
-    text: "#991b1b",
-    dot: "#ef4444",
-  },
+export interface DocActivityWithDocument extends DocActivity { docTitle?:string|null; stdCode?:string|null; }
+export interface StatsByStatus { done:number; review:number; prog:number; todo:number; block:number; }
+export interface StatsActivity { id:string; actor:string; action:string; message:string; createdAt:string; docTitle?:string|null; stdCode?:string|null; }
+export interface UpcomingDoc { id:string; title:string; stdCode:string; pic?:string|null; status:StatusKey; progress:number; dueDate?:string|null; color?:string|null; }
+export interface DashboardStats { total:number; byStatus:StatsByStatus; avgProgress:number; overdue:number; activities:StatsActivity[]; upcoming:UpcomingDoc[]; }
+export const STATUS_META:Record<StatusKey,{label:string;color:string;bg:string;text:string;dot:string}> = {
+ done:{label:"Selesai",color:"#059669",bg:"#d1fae5",text:"#065f46",dot:"#10b981"},
+ review:{label:"Perlu review",color:"#d97706",bg:"#fef3c7",text:"#92400e",dot:"#f59e0b"},
+ prog:{label:"Berjalan",color:"#0284c7",bg:"#e0f2fe",text:"#075985",dot:"#38bdf8"},
+ todo:{label:"Belum mulai",color:"#64748b",bg:"#f1f5f9",text:"#334155",dot:"#94a3b8"},
+ block:{label:"Terhambat",color:"#e11d48",bg:"#ffe4e6",text:"#9f1239",dot:"#fb7185"},
 };
-
-export const STATUS_ORDER: StatusKey[] = [
-  "done",
-  "review",
-  "prog",
-  "todo",
-  "block",
-];
-
-export const PRIORITY_LIST: Priority[] = ["Tinggi", "Sedang", "Rendah"];
-
-export const PRIORITY_META: Record<
-  Priority,
-  { text: string; bg: string }
-> = {
-  Tinggi: { text: "text-rose-600", bg: "bg-rose-50" },
-  Sedang: { text: "text-amber-600", bg: "bg-amber-50" },
-  Rendah: { text: "text-slate-500", bg: "bg-slate-100" },
-};
-
-export type ViewMode = "grid" | "list" | "kanban" | "gantt";
