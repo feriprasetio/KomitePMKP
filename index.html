@@ -7,7 +7,7 @@
   <title>Komite PMKP | UPT RSUD Sultan Syarif Mohamad Alkadrie</title>
   <meta name="description" content="Portal Peningkatan Mutu dan Keselamatan Pasien.">
   <style>
-    :root{color-scheme:light;--ink:#172b39;--muted:#637785;--line:#dce8e9;--green:#0d7565;--green2:#12a084;--wash:#eff8f6;--surface:#fff;--amber:#98650b}
+    :root{color-scheme:light;--ink:#172b39;--muted:#637785;--line:#dce8e9;--green:#0d7565;--wash:#eff8f6;--amber:#98650b}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 10% 0%,#d9f5ed 0,transparent 35%),radial-gradient(circle at 95% 15%,#e2efff 0,transparent 32%),#f6f9fb;color:var(--ink);font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
     .wrap{max-width:1040px;margin:auto;padding:30px 22px 48px}.top{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0 36px}.brand{display:flex;align-items:center;gap:13px;font-weight:750;letter-spacing:-.02em}.mark{width:44px;height:44px;display:grid;place-items:center;border-radius:14px;color:white;background:linear-gradient(145deg,var(--green),#19b697);box-shadow:0 8px 22px #0d75652b}.tag{border:1px solid #cfe1df;border-radius:999px;padding:6px 11px;font-size:12px;color:#32645f;background:#ffffffa8}
     .hero{display:grid;grid-template-columns:1.35fr .85fr;gap:30px;align-items:center;padding:42px;border:1px solid #dce9e7;border-radius:28px;background:#ffffffc9;box-shadow:0 20px 60px #274c5810;backdrop-filter:blur(10px)}.eyebrow{font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--green)}h1{font-size:clamp(34px,5vw,54px);line-height:1.08;letter-spacing:-.055em;margin:14px 0 18px}p{color:var(--muted);margin:0 0 17px}.hero p{max-width:570px;font-size:17px}.panel{padding:23px;border-radius:20px;border:1px solid var(--line);background:white}.panel h2{font-size:16px;margin:0 0 12px}.status{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:var(--amber);padding:12px 13px;background:#fff7e5;border:1px solid #f0dfb5;border-radius:12px}.dot{width:9px;height:9px;border-radius:50%;background:#dc9c21;box-shadow:0 0 0 4px #f9e9c3}.small{font-size:13px;margin-top:12px}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}.step{padding:20px;border-radius:18px;background:#fff;border:1px solid var(--line)}.num{display:grid;place-items:center;width:31px;height:31px;border-radius:10px;background:var(--wash);color:var(--green);font-weight:800;margin-bottom:12px}.step strong{display:block;margin-bottom:5px}.step p{font-size:13px;margin:0}.foot{display:flex;justify-content:space-between;gap:16px;padding:24px 2px 0;color:#71828d;font-size:12px}.links{display:flex;gap:15px;flex-wrap:wrap}.links a{color:var(--green);text-decoration:none;font-weight:650}.links a:hover{text-decoration:underline}
@@ -17,9 +17,7 @@
 <body>
   <main class="wrap">
     <header class="top">
-      <div class="brand"><span class="mark" aria-hidden="true">
-        <svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".45"/></svg>
-      </span><span>Komite PMKP</span></div>
+      <div class="brand"><span class="mark" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".45"/></svg></span><span>Komite PMKP</span></div>
       <span class="tag">Portal Mutu &amp; Keselamatan Pasien</span>
     </header>
     <section class="hero">
@@ -32,15 +30,15 @@
       <aside class="panel">
         <h2>Status aplikasi</h2>
         <div class="status"><span class="dot"></span>Runtime aplikasi belum terhubung</div>
-        <p class="small">Halaman ini adalah landing page statis. Dashboard memerlukan hosting aplikasi server (Next.js), konfigurasi rahasia, dan koneksi database yang teruji. GitHub Pages tidak menjalankan API server atau proses autentikasi Next.js.</p>
+        <p class="small">Dashboard membutuhkan hosting Next.js server-side dan proyek Supabase yang khusus untuk Komite PMKP. Database AUREKA tidak digunakan oleh aplikasi ini.</p>
       </aside>
     </section>
     <section class="steps" aria-label="Tahap kesiapan">
-      <article class="step"><span class="num">01</span><strong>Database</strong><p>Skema inti PMKP telah disiapkan di Supabase tanpa data dokumen simulasi.</p></article>
-      <article class="step"><span class="num">02</span><strong>Keamanan</strong><p>Tabel PMKP memakai Row Level Security dan tidak terbuka untuk akses REST publik.</p></article>
-      <article class="step"><span class="num">03</span><strong>Deployment</strong><p>Source aplikasi dan environment server harus dipasang pada hosting yang mendukung Next.js sebelum dashboard dapat dipakai.</p></article>
+      <article class="step"><span class="num">01</span><strong>Database terpisah</strong><p>Proyek Supabase khusus PMKP menunggu penetapan organisasi dan persetujuan biaya.</p></article>
+      <article class="step"><span class="num">02</span><strong>Keamanan</strong><p>Migration PMKP di repository menyiapkan Row Level Security dan pembatasan akses API publik.</p></article>
+      <article class="step"><span class="num">03</span><strong>Deployment</strong><p>Setelah database khusus tersedia, konfigurasi server dan pengujian login serta CRUD perlu diselesaikan.</p></article>
     </section>
-    <footer class="foot"><span>© Komite PMKP · UPT RSUD Sultan Syarif Mohamad Alkadrie</span><span>Lingkungan produksi tidak menggunakan data simulasi.</span></footer>
+    <footer class="foot"><span>© Komite PMKP · UPT RSUD Sultan Syarif Mohamad Alkadrie</span><span>Tidak memakai database AUREKA.</span></footer>
   </main>
 </body>
 </html>
